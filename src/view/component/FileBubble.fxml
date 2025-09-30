@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressIndicator?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.StackPane?>
+
+<AnchorPane fx:id="fileFormat" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="38.0" prefWidth="163.0" style="-fx-background-radius: 15px; -fx-background-color: #F5F5F5;; -fx-border-width: 0;" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.render.FileRenderMessage">
+   <children>
+      <FontAwesomeIcon fill="#b383ff" glyphName="FILE" layoutX="5.0" layoutY="27.0" size="1.7em" text="" />
+      <StackPane fx:id="downloadStatus" layoutX="121.0" layoutY="6.0" prefHeight="27.0" prefWidth="36.0" style="-fx-background-color: #CCCC; -fx-background-radius: 50%;">
+         <children>
+            <FontAwesomeIcon fx:id="downloadIcon" fill="#007bff" glyphName="DOWNLOAD" />
+            <ProgressIndicator fx:id="progressCircle" prefHeight="27" prefWidth="27" visible="false" />
+            <FontAwesomeIcon fx:id="checkIcon" fill="#00cc66" glyphName="CHECK" visible="false" />
+         </children>
+      </StackPane>
+      <Label fx:id="nameText" layoutX="33.0" layoutY="6.0" style="-fx-text-fill: #333333;" text="text.pdf" />
+   </children>
+</AnchorPane>
