@@ -116,6 +116,10 @@
             </ScrollPane>
             <HBox alignment="CENTER" layoutY="565.0" prefHeight="46.0" prefWidth="623.0" style="-fx-spacing: 20;">
                <children>
+                <StackPane onMouseClicked="#openImages" prefHeight="35.0" prefWidth="38.0" style="-fx-background-radius: 50%;" styleClass="paper-clip">
+                     <children>
+                        <FontAwesomeIcon glyphName="PICTURE_ALT" size="1.5em" />
+                     </children></StackPane>
                   <TextField fx:id="messageText" onKeyPressed="#sendMessage" prefHeight="26.0" prefWidth="454.0" promptText="Nhập tin nhắn để gửi " style="-fx-padding: 10 15 10 15; -fx-background-color: #EEEEEE; -fx-background-radius: 15; -fx-border-width: 0;">
                      <font>
                         <Font name="Arial" size="12.0" />

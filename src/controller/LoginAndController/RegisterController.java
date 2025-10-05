@@ -156,47 +156,53 @@ public class RegisterController implements Initializable {
 						user.setCreateAt(new Date());
 						user.setPassword(PasswordUtil.hashPassword(password.getText()));
 
-						socketClient = SocketClient.getInstance();
 						Packet packetRequest = new Packet();
 						packetRequest.setType("REGISTER");
 						packetRequest.setData(user);
 
 						socketClient.sendPacket(packetRequest);
+						Packet packetReponse;
 
-						Packet packetReponse = socketClient.responseQueue.poll(5, TimeUnit.SECONDS);
+						if (socketClient.getInstance().responseQueue != null) {
 
-						if (packetReponse != null) {
+							packetReponse = socketClient.getInstance().responseQueue.poll(5, TimeUnit.SECONDS);
 
-							if (packetReponse.getType().equals("REGISTER_RESULT")) {
-								String userID = socketClient.gson
-										.fromJson(socketClient.gson.toJson(packetReponse.getData()), String.class);
+							if (packetReponse != null) {
 
-								Platform.runLater(() -> {
-									setDefault();
+								if (packetReponse.getType().equals("REGISTER_RESULT")) {
+									String userID = socketClient.gson
+											.fromJson(socketClient.gson.toJson(packetReponse.getData()), String.class);
 
-									if (userID != null) {
-										FadeTransition fade = new FadeTransition(Duration.millis(300), button);
-										fade.setFromValue(0);
-										fade.setToValue(1);
-										fade.play();
+									Platform.runLater(() -> {
+										setDefault();
 
-										commonController.alertInfo(Alert.AlertType.CONFIRMATION, "Thành công!",
-												"Bạn đã tạo tài khoản thành công!");
+										if (userID != null) {
+											FadeTransition fade = new FadeTransition(Duration.millis(300), button);
+											fade.setFromValue(0);
+											fade.setToValue(1);
+											fade.play();
 
-										clean();
+											commonController.alertInfo(Alert.AlertType.CONFIRMATION, "Thành công!",
+													"Bạn đã tạo tài khoản thành công!");
 
-										// load login
-										parentController.open_signin(null);
+											clean();
 
-									} else {
-										commonController.alertInfo(Alert.AlertType.ERROR, "Lỗi!",
-												"Không thể tạo tài khoản. Vui lòng thử lại.");
-									}
-								});
+											// load login
+											parentController.open_signin(null);
+
+										} else {
+											commonController.alertInfo(Alert.AlertType.ERROR, "Lỗi!",
+													"Không thể tạo tài khoản. Vui lòng thử lại.");
+										}
+									});
+								} else if (packetReponse.getType().equals("DUPLICATE_UserName")) {
+									commonController.alertInfo(AlertType.INFORMATION, "Không thể tạo tài khoản!!!!",
+											"Tên đã được sử dụng!");
+								}
+							} else {
+								commonController.alertInfo(AlertType.ERROR, "Cảnh báo!!!!",
+										"Không nhận được phản hồi nào từ server!");
 							}
-						} else {
-							commonController.alertInfo(AlertType.ERROR, "Cảnh báo!!!!",
-									"Không nhận được phản hồi nào từ server!");
 						}
 					} else {
 						Platform.runLater(() -> {
@@ -246,6 +252,35 @@ public class RegisterController implements Initializable {
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
+		try {
+			socketClient = SocketClient.getInstance();
+
+			socketClient.setOnServerDisconnected(reason -> {
+				Platform.runLater(() -> {
+
+					commonController.alertInfo(AlertType.WARNING, "❌ Server disconnected", reason);
+
+					commonController.alertConfirm("Kết nối lại SERVER",
+							"Bạn có chắc muốn kết nối lại với Server hay không?", confirmed -> {
+								if (confirmed) {
+									try {
+										socketClient.reConnectToServer();
+									} catch (InterruptedException e) {
+										// TODO Auto-generated catch block
+										e.printStackTrace();
+									}
+								} else {
+									System.out.println("Người dùng hủy thao tác.");
+								}
+							});
+
+				});
+			});
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 		genderGroup = new ToggleGroup();
 		maleRadio.setToggleGroup(genderGroup);
 		femaleRadio.setToggleGroup(genderGroup);

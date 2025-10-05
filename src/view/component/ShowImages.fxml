@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.StackPane?>
+
+<AnchorPane fx:id="fileFormat" prefHeight="226.0" prefWidth="253.0" style="-fx-background-color: transparent; -fx-border-width: 0; -fx-background-radius: 35px;" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.render.FileRenderMessage">
+
+    <children>
+        <!-- Container hiển thị ảnh, có bo góc -->
+        <StackPane style="-fx-background-radius: 35px; -fx-background-color: transparent;" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+
+            <ImageView fx:id="imageView" fitHeight="226.0" fitWidth="253.0" pickOnBounds="true" preserveRatio="true" smooth="true" style="-fx-background-radius: 35px;" visible="false" />
+        </StackPane>
+    </children>
+</AnchorPane>

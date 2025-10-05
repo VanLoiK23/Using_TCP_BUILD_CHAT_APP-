@@ -25,6 +25,14 @@ public class RedisUtil {
             e.printStackTrace();
         }
     }
+    
+    public static boolean isAlive() {
+	    try {
+	        return "PONG".equals(jedisPooled.ping());
+	    } catch (Exception e) {
+	        return false;
+	    }
+	}
 
     public static JedisPooled getClient() {
         return jedisPooled;

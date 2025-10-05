@@ -98,7 +98,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Vector;
+import java.util.function.Consumer;
 
 import com.fatboyindustrial.gsonjavatime.Converters;
 import com.google.gson.Gson;
@@ -131,9 +135,13 @@ public class SocketServer implements Runnable {
 	private CloudinaryService cloudinaryService;
 	private ChatService chatService;
 	private String userID;
+	private String clientIP;
 
 	// Danh sách tất cả client đang kết nối (dùng Vector để quản lý)
 	private static Vector<SocketServer> clients = new Vector<>();
+
+	private static Consumer<SocketServer> onClientConnected;
+	private static Consumer<SocketServer> onClientDisConnected;
 
 	public SocketServer(Socket socket) {
 		try {
@@ -149,6 +157,7 @@ public class SocketServer implements Runnable {
 
 			clients.add(this); // thêm client vào danh sách
 
+			this.clientIP = socket.getInetAddress().toString();
 			System.out.println("Client connected: " + socket.getInetAddress());
 
 		} catch (IOException e) {
@@ -169,21 +178,52 @@ public class SocketServer implements Runnable {
 				System.out.println(packet);
 				switch (packet.getType()) {
 				case "LOGIN": {
-					LoginHandler loginHandler = new LoginHandler(userService, gson);
-					Packet loginResponse = loginHandler.handle(packet);
-					// if login success add to list online
-					User user = gson.fromJson(gson.toJson(loginResponse.getData()), User.class);
-					if (user != null) {
-						this.userID = user.getIdHex();
-						redisOnlineService.setUserOnline(this.userID);
+					User userCheck = gson.fromJson(gson.toJson(packet.getData()), User.class);
+
+					User userResult = userService.getUserByUserName(userCheck.getUsername());
+					if (userResult != null && isUserOnline(userResult.getIdHex())) {
+						Packet response = new Packet();
+						response.setType("DUPLICATE_LOGIN");
+						response.setData(null);
+
+						sendSelfClient(response);
+					} else {
+
+						LoginHandler loginHandler = new LoginHandler(userService, gson);
+						Packet loginResponse = loginHandler.handle(packet);
+						// if login success add to list online
+						User user = gson.fromJson(gson.toJson(loginResponse.getData()), User.class);
+						if (user != null) {
+							this.userID = user.getIdHex();
+							if (RedisUtil.isAlive()) {
+								redisOnlineService.setUserOnline(this.userID);
+							}
+						}
+						// only login success
+						if (onClientConnected != null) {
+							onClientConnected.accept(this);
+						}
+
+						sendSelfClient(loginResponse);
 					}
-					sendSelfClient(loginResponse);
 					break;
 				}
 				case "REGISTER": {
-					RegisterHandler registerHandler = new RegisterHandler(userService, gson);
-					Packet registerReponse = registerHandler.handle(packet);
-					sendSelfClient(registerReponse);
+					User userCheck = gson.fromJson(gson.toJson(packet.getData()), User.class);
+
+					User userResult = userService.getUserByUserName(userCheck.getUsername());
+
+					if (userResult != null) {
+						Packet response = new Packet();
+						response.setType("DUPLICATE_UserName");
+						response.setData(null);
+
+						sendSelfClient(response);
+					} else {
+						RegisterHandler registerHandler = new RegisterHandler(userService, gson);
+						Packet registerReponse = registerHandler.handle(packet);
+						sendSelfClient(registerReponse);
+					}
 					break;
 				}
 				case "FILE_META": {
@@ -205,6 +245,17 @@ public class SocketServer implements Runnable {
 
 					break;
 				}
+				case "PING": {
+					Packet pong = new Packet();
+					pong.setType("PONG");
+					pong.setData("pong");
+
+					sendSelfClient(pong);
+
+					System.out.println("Response: " + pong);
+
+					break;
+				}
 				default:
 
 					MessageHandler messageHandler = new MessageHandler(chatService, gson);
@@ -213,7 +264,11 @@ public class SocketServer implements Runnable {
 					}
 				}
 			}
+		} catch (SocketTimeoutException e) {
+			System.out.println("Client không gửi dữ liệu, đóng kết nối");
+//			close();
 		} catch (IOException e) {
+			e.printStackTrace();
 			close();
 		}
 	}
@@ -221,6 +276,8 @@ public class SocketServer implements Runnable {
 	private void sendSelfClient(Packet packet) throws IOException {
 		this.out.writeUTF(gson.toJson(packet));
 		this.out.flush();
+
+		System.out.println("Sent " + packet);
 	}
 
 	// Gửi tin nhắn cho tất cả client trong Vector
@@ -240,6 +297,74 @@ public class SocketServer implements Runnable {
 		}
 	}
 
+	public static void unConnectClient(String userID) {
+		if (userID.equals("all")) {
+			List<SocketServer> toRemove = new ArrayList<>();
+
+			synchronized (clients) {
+				for (SocketServer client : new ArrayList<>(clients)) {
+
+					if (client.getUserID() != null) {
+						client.close();
+//	                if (onClientDisConnected != null) {
+//	                    onClientDisConnected.accept(client);
+//	                }
+						toRemove.add(client);
+					}
+				}
+
+				clients.removeAll(toRemove);
+			}
+
+			for (SocketServer client : toRemove) {
+				if (onClientDisConnected != null) {
+					onClientDisConnected.accept(client);
+				}
+			}
+			return;
+		}
+
+		SocketServer target = null;
+		for (SocketServer client : clients) {
+			if (userID.equals(client.getUserID())) {
+				client.close();
+				if (onClientDisConnected != null) {
+					onClientDisConnected.accept(client);
+				}
+				target = client;
+				break;
+			}
+		}
+
+		if (target != null) {
+			clients.remove(target);
+		}
+	}
+
+	private static boolean isUserOnline(String userID) {
+		return getClients().stream().anyMatch(c -> userID.equals(c.getUserID()));
+	}
+
+	public static Vector<SocketServer> getClients() {
+		return clients;
+	}
+
+	public String getUserID() {
+		return userID;
+	}
+
+	public String getClientIP() {
+		return clientIP;
+	}
+
+	public static void setOnClientConnected(Consumer<SocketServer> consumer) {
+		onClientConnected = consumer;
+	}
+
+	public static void setOffClientDisConnected(Consumer<SocketServer> consumer) {
+		onClientDisConnected = consumer;
+	}
+
 	// Đóng kết nối
 	private void close() {
 		try {
@@ -252,10 +377,16 @@ public class SocketServer implements Runnable {
 
 			clients.remove(this);
 
+			if (onClientDisConnected != null && userID != null && !userID.isEmpty()) {
+				onClientDisConnected.accept(this);
+			}
+
 			System.out.println("Client disconnected.");
 
 			// remove from list online
-			redisOnlineService.setUserOffline(this.userID);
+			if (this.userID != null) {
+				redisOnlineService.setUserOffline(this.userID);
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

@@ -72,10 +72,10 @@ public class ChatService {
 		Bson filter;
 		// group community
 		if (userB.equals("all")) {
-			filter = eq("receiverId", userB);
+			filter = eq("receiver_id", userB);
 		} else {
-			filter = or(and(eq("senderId", userA), eq("receiverId", userB)),
-					and(eq("senderId", userB), eq("receiverId", userA)));
+			filter = or(and(eq("sender_id", userA), eq("receiver_id", userB)),
+					and(eq("sender_id", userB), eq("receiver_id", userA)));
 		}
 
 		FindIterable<Document> documents = messageCollection.find(filter).sort(Sorts.ascending("timestamp"));

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +14,9 @@ import java.util.ResourceBundle;
 import controller.Common.CommonController;
 import controller.ServerAndClientSocket.SocketClient;
 import controller.render.FileRenderMessage;
+import controller.render.MessageRender;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -113,18 +116,33 @@ public class MainController implements Initializable {
 
 		Image image = new Image(user.getAvatarUrl(), true);
 
+		image.errorProperty().addListener((obs, oldVal, newVal) -> {
+			if (newVal) {
+				System.out.println("❌ Lỗi tải ảnh: " + user.getAvatarUrl());
+			}
+		});
+
 		image.progressProperty().addListener((obs, oldVal, newVal) -> {
 			if (newVal.doubleValue() == 1.0 && !image.isError()) {
-				avatarUser.setFill(new ImagePattern(image));
+				Platform.runLater(() -> {
+					avatarUser.setFill(new ImagePattern(image));
+				});
 			}
 		});
 
 		// load message from mongoDB
-		try {
-			loadChatHistory(user.getIdHex(), "all");
-		} catch (IOException e) {
-			e.printStackTrace();
+		if (user != null) {
+			Task<Void> loadTask = new Task<>() {
+				@Override
+				protected Void call() throws Exception {
+					loadChatHistory(user.getIdHex(), "all");
+					return null;
+				}
+			};
+
+			new Thread(loadTask).start();
 		}
+
 	}
 
 	@FXML
@@ -157,8 +175,8 @@ public class MainController implements Initializable {
 
 	}
 
-	private void onSend(String messenger, String receiverId) throws IOException {
-		if (messageText.getText() != null && !messageText.getText().isEmpty()) {
+	private void onSend(String messenger, String receiverId) throws IOException, InterruptedException {
+		if (commonController.checkValidTextField(messageText)) {
 
 			ChatMessage chatMessage = new ChatMessage();
 			chatMessage.setSenderId(user.getIdHex());
@@ -175,9 +193,11 @@ public class MainController implements Initializable {
 			packetRequest.setType("MESSAGE");
 			packetRequest.setData(chatMessage);
 
-			socketClient.sendPacket(packetRequest);
-
-			onSendAndReceiveMessenge(chatMessage, true);
+			if (socketClient.sendPacket(packetRequest)) {
+				onSendAndReceiveMessenge(chatMessage, true);
+			} else {
+				commonController.alertInfo(AlertType.WARNING, "Establieshed to server is fail", "Can't send message");
+			}
 
 			messageText.clear();
 		}
@@ -206,8 +226,13 @@ public class MainController implements Initializable {
 
 		// fetch from cache tang toc do
 		User userSender = new User();
-		userSender.setUsername(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-		userSender.setAvatarUrl(redisUserService.getCachedAvatar(chatMessage.getSenderId()));
+		if (chatMessage.getSenderId().equals("Server")) {
+			userSender.setUsername("Tin nhắn hệ thống");
+			userSender.setAvatarUrl("https://i.ibb.co/yBhhZRdB/images.jpg");
+		} else {
+			userSender.setUsername(redisUserService.getCachedUsername(chatMessage.getSenderId()));
+			userSender.setAvatarUrl(redisUserService.getCachedAvatar(chatMessage.getSenderId()));
+		}
 
 		// Avatar hình tròn
 
@@ -286,151 +311,15 @@ public class MainController implements Initializable {
 		lastSenderId = chatMessage.getSenderId();
 	}
 
-//	public void renderFileMessage(Packet packet) {
-//	    FileLinkPacket fileData = gson.fromJson(gson.toJson(packet.getData()), FileLinkPacket.class);
-//
-//	    String filename = fileData.getFilename();
-//	    String url = fileData.getDownloadUrl();
-//
-//	    // Tạo UI giống Messenger
-//	    JLabel fileLabel = new JLabel("📎 " + filename);
-//	    JButton downloadButton = new JButton("Tải xuống");
-//
-//	    downloadButton.addActionListener(e -> {
-//	        try {
-//	            Desktop.getDesktop().browse(new URI(url));
-//	        } catch (Exception ex) {
-//	            ex.printStackTrace();
-//	        }
-//	    });
-//
-//	    JPanel filePanel = new JPanel();
-//	    filePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
-//	    filePanel.add(fileLabel);
-//	    filePanel.add(downloadButton);
-//
-//	    chatPanel.add(filePanel); // Thêm vào khung chat
-//	    chatPanel.revalidate();
-//	    chatPanel.repaint();
-//	}
-
-//	public void renderFileMessage(ChatMessage chatMessage, boolean isSend) {
-//	    FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);
-//	    String filename = fileData.getFileName();
-//	    String url = fileData.getUrlUpload();
-//
-//	    Label fileLabel = new Label("📎 " + filename);
-//	    fileLabel.setStyle("-fx-font-weight: bold;");
-//	    
-//	    ProgressIndicator circleProgress = new ProgressIndicator(0);
-//	    circleProgress.setPrefSize(50, 50);
-//	    Label percentLabel = new Label("0%");
-//	    percentLabel.setStyle("-fx-font-weight: bold;");
-//	    
-//	    StackPane progressCircle = new StackPane(circleProgress, percentLabel);
-//	    progressCircle.setVisible(false); // ẩn ban đầu
-//
-//
-//	    Button downloadButton = new Button("Tải xuống");
-//	    downloadButton.setStyle("-fx-background-color: transparent; -fx-text-fill: blue; -fx-underline: true;");
-//	    downloadButton.setOnAction(e -> {
-//	        DirectoryChooser chooser = new DirectoryChooser();
-//	        chooser.setTitle("Chọn thư mục lưu file");
-//	        File folder = chooser.showDialog(vboxInScroll.getScene().getWindow());
-//
-//	        if (folder != null) {
-//	            progressCircle.setVisible(true);
-//	            percentLabel.setText("0%");
-//
-//	            Task<Void> downloadTask = new Task<>() {
-//	                @Override
-//	                protected Void call() throws Exception {
-//	                    URL website = new URL(url);
-//	                    URLConnection connection = website.openConnection();
-//	                    int fileSize = connection.getContentLength();
-//
-//	                    try (InputStream in = website.openStream();
-//	                         FileOutputStream fos = new FileOutputStream(new File(folder, filename))) {
-//
-//	                        byte[] buffer = new byte[4096];
-//	                        int bytesRead;
-//	                        int totalRead = 0;
-//
-//	                        while ((bytesRead = in.read(buffer)) != -1) {
-//	                            fos.write(buffer, 0, bytesRead);
-//	                            totalRead += bytesRead;
-//	                            double progress = (double) totalRead / fileSize;
-//	                            updateProgress(progress, 1);
-//	                        }
-//	                    }
-//
-//	                    return null;
-//	                }
-//	            };
-//
-//	            circleProgress.progressProperty().bind(downloadTask.progressProperty());
-//
-//	            downloadTask.progressProperty().addListener((obs, oldVal, newVal) -> {
-//	                int percent = (int) Math.round(newVal.doubleValue() * 100);
-//	                percentLabel.setText(percent + "%");
-//	            });
-//
-//	            downloadTask.setOnSucceeded(ev -> {
-//	                percentLabel.setText("✅");
-//	                try {
-//	                    Desktop.getDesktop().open(new File(folder, filename));
-//	                } catch (IOException ex) {
-//	                    ex.printStackTrace();
-//	                }
-//	            });
-//
-//	            downloadTask.setOnFailed(ev -> percentLabel.setText("❌"));
-//
-//	            new Thread(downloadTask).start();
-//	        }
-//	    });
-//
-//	    VBox fileBox = new VBox(5, fileLabel, downloadButton, progressCircle);
-//	    fileBox.setPadding(new Insets(5, 10, 5, 10));
-//	    fileBox.setMaxWidth(300);
-//
-//	    Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
-//	    mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT, "-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"));
-//	    mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT, "-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
-//
-//	    fileBox.setStyle(mapStyleMessenger.get(isSend).styleCss);
-//
-//	    HBox hBox = new HBox(10);
-//	    hBox.setAlignment(mapStyleMessenger.get(isSend).position);
-//	    hBox.setPadding(new Insets(5, 5, 5, 10));
-//
-//	    if (!isSend) {
-//	        ImageView avatar = new ImageView(new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
-//	        avatar.setFitWidth(30);
-//	        avatar.setFitHeight(30);
-//	        avatar.setClip(new Circle(15, 15, 15));
-//	        hBox.getChildren().addAll(avatar, fileBox);
-//	    } else {
-//	        hBox.getChildren().add(fileBox);
-//	    }
-//
-//	    VBox messageBox = new VBox(2);
-//	    if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
-//	        Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-//	        nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-//	        messageBox.getChildren().addAll(nameLabel, hBox);
-//	    } else {
-//	        messageBox.getChildren().add(hBox);
-//	    }
-//
-//	    Platform.runLater(() -> vboxInScroll.getChildren().add(messageBox));
-//	    lastSenderId = chatMessage.getSenderId();
-//	}
-
 	public void renderFileMessage(ChatMessage chatMessage, boolean isSend) throws IOException {
 		FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);
 
-		FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/FileBubble.fxml"));
+		String fileName = fileData.getUrlUpload();
+		String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+		boolean isImage = extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png");
+		
+		FXMLLoader loader = new FXMLLoader(getClass()
+				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
 		Node fileBubble = loader.load();
 
 		Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
@@ -440,7 +329,12 @@ public class MainController implements Initializable {
 				"-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
 
 		FileRenderMessage controller = loader.getController();
-		controller.setFileInfo(fileData); // truyền dữ liệu vào controller
+		// truyền dữ liệu vào controller
+		if (isImage) {
+			controller.setImageInfo(fileData);
+		} else {
+			controller.setFileInfo(fileData);
+		}
 
 //	    Platform.runLater(() -> vboxInScroll.getChildren().add(fileBubble));
 
@@ -503,45 +397,25 @@ public class MainController implements Initializable {
 	}
 
 	@FXML
-	void sendMessage(KeyEvent event) throws IOException {
+	void sendMessage(KeyEvent event) throws IOException, InterruptedException {
 		if (event.getCode().toString().equals("ENTER")) {
 			onSend(messageText.getText(), "all");
 		}
 	}
 
-	public void renderLocalFileMessage(File file) throws IOException {
-//	    String filename = file.getName();
-//
-//	    Label fileLabel = new Label("📎 " + filename);
-//	    fileLabel.setStyle("-fx-font-weight: bold;");
-//
-//	    Button openButton = new Button("Mở file");
-//	    openButton.setStyle("-fx-background-color: transparent; -fx-text-fill: blue; -fx-underline: true;");
-//	    openButton.setOnAction(e -> {
-//	        try {
-//	            Desktop.getDesktop().open(file); // Mở file bằng app mặc định
-//	        } catch (IOException ex) {
-//	            ex.printStackTrace();
-//	        }
-//	    });
-//
-//	    VBox fileBox = new VBox(5, fileLabel, openButton);
-//	    fileBox.setPadding(new Insets(5, 10, 5, 10));
-//	    fileBox.setMaxWidth(300);
-//	    fileBox.setStyle("-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;");
-//
-//	    HBox hBox = new HBox(fileBox);
-//	    hBox.setAlignment(Pos.CENTER_RIGHT);
-//	    hBox.setPadding(new Insets(5, 5, 5, 10));
-//
-//	    VBox messageBox = new VBox(hBox);
-//	    vboxInScroll.getChildren().add(messageBox);
+	public void renderLocalFileMessage(File file, Boolean isImage) throws IOException {
+		FXMLLoader loader = new FXMLLoader(getClass()
+				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
 
-		FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/FileBubble.fxml"));
 		Node fileBubble = loader.load();
 
 		FileRenderMessage controller = loader.getController();
-		controller.setFileInfoLocal(file); // truyền dữ liệu vào controller
+		// truyền dữ liệu vào controller
+		if(isImage) {
+			controller.setImagesLocal(file);
+		}else {
+			controller.setFileInfoLocal(file);
+		}
 
 		HBox hBox = new HBox(fileBubble);
 		hBox.setAlignment(Pos.CENTER_RIGHT);
@@ -552,14 +426,31 @@ public class MainController implements Initializable {
 	}
 
 	@FXML
-	void openFileChoosen(MouseEvent event) throws IOException {
+	void openFileChoosen(MouseEvent event) throws IOException, InterruptedException {
+		openFileOrImageChoosen(event, false);
+	}
+
+	@FXML
+	void openImages(MouseEvent event) throws IOException, InterruptedException {
+		openFileOrImageChoosen(event, true);
+	}
+
+	private void openFileOrImageChoosen(MouseEvent event, Boolean isImage) throws IOException, InterruptedException {
+		String word = (isImage) ? "Ảnh" : "File";
 		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Chọn file để gửi");
+		fileChooser.setTitle("Chọn " + ((isImage) ? "ảnh" : "file") + " để gửi");
 
 		// Tùy chọn định dạng file
-		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Tất cả file", "*.*"),
-				new FileChooser.ExtensionFilter("Ảnh", "*.png", "*.jpg", "*.jpeg"),
-				new FileChooser.ExtensionFilter("Tài liệu", "*.pdf", "*.docx", "*.txt"));
+		List<FileChooser.ExtensionFilter> filters = new ArrayList<>();
+
+		if (isImage) {
+		    filters.add(new FileChooser.ExtensionFilter("Ảnh", "*.png", "*.jpg", "*.jpeg"));
+		} else {
+		    filters.add(new FileChooser.ExtensionFilter("Tất cả file", "*.*"));
+			filters.add(new FileChooser.ExtensionFilter("Tài liệu", "*.pdf", "*.docx", "*.txt"));
+		}
+
+		fileChooser.getExtensionFilters().addAll(filters);
 
 		// Mở hộp thoại
 		File selectedFile = fileChooser.showOpenDialog(((Node) event.getSource()).getScene().getWindow());
@@ -568,19 +459,25 @@ public class MainController implements Initializable {
 			long maxSize = 10 * 1024 * 1024; // 10MB
 
 			if (selectedFile.length() > maxSize) {
-				commonController.alertInfo(AlertType.WARNING, "File quá lớn!!!!", "Vui lòng chọn file nhỏ hơn 10MB.");
+
+				commonController.alertInfo(AlertType.WARNING, word + " quá lớn!!!!",
+						"Vui lòng chọn " + word + " nhỏ hơn 10MB.");
 				return;
 			}
 
-			System.out.println("File hợp lệ: " + selectedFile.getAbsolutePath());
+			System.out.println(word + " hợp lệ: " + selectedFile.getAbsolutePath());
 
-			renderLocalFileMessage(selectedFile);
+			if (socketClient.checkRunningServer()) {
+				socketClient.sendFile(selectedFile, user.getIdHex(), "all");
 
-			socketClient.sendFile(selectedFile, user.getIdHex(), "all");
-
+				renderLocalFileMessage(selectedFile,isImage);
+			} else {
+				commonController.alertInfo(AlertType.WARNING, "Establieshed to server is fail", "Can't send " + word);
+				socketClient.reConnectToServer();
+			}
 		} else {
-			commonController.alertInfo(AlertType.INFORMATION, "Không có file nào được chọn!!!!", "Vui lòng chọn file.");
-			System.out.println("Không có file nào được chọn.");
+			commonController.alertInfo(AlertType.INFORMATION, "Không có " + word + " nào được chọn!!!!",
+					"Vui lòng chọn " + word + ".");
 		}
 	}
 
@@ -630,41 +527,106 @@ public class MainController implements Initializable {
 		scrollMessage.setFitToWidth(true);
 		commonController = new CommonController();
 
-		socketClient = SocketClient.getInstance();
-		socketClient.setMessageHandler(chatMessage -> {
-			try {
-				onSendAndReceiveMessenge(chatMessage, false);
-			} catch (MalformedURLException e) {
-				e.printStackTrace();
-				System.out.println("Can't receive message");
-			}
-		});
+		try {
+			socketClient = SocketClient.getInstance();
 
-		socketClient.setFileMessageHandler(chatMessage -> {
-			try {
-				renderFileMessage(chatMessage, false);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			System.out.println("File :" + chatMessage);
-		});
+			socketClient.setMessageHandler(chatMessage -> {
+				try {
+					onSendAndReceiveMessenge(chatMessage, false);
+				} catch (MalformedURLException e) {
+					e.printStackTrace();
+					System.out.println("Can't receive message");
+				}
+			});
+
+			socketClient.setFileMessageHandler(chatMessage -> {
+				try {
+					renderFileMessage(chatMessage, false);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				System.out.println("File :" + chatMessage);
+			});
+
+			socketClient.setOnServerDisconnected(reason -> {
+				Platform.runLater(() -> {
+
+					commonController.alertInfo(AlertType.WARNING, "❌ Server disconnected", reason);
+
+					commonController.alertConfirm("Mất kết nối với SERVER",
+							"Bạn có chắc muốn đăng nhập lại với Server hay không?", confirmed -> {
+								if (confirmed) {
+
+									Platform.runLater(() -> {
+										try {
+											commonController.loaderToResource(container_chat,
+													"LoginAndRegister/FormLoginAndRegister");
+											socketClient.reConnectToServer();
+
+										} catch (IOException e) {
+											e.printStackTrace();
+										} catch (InterruptedException e) {
+											// TODO Auto-generated catch block
+											e.printStackTrace();
+										}
+									});
+
+								} else {
+									System.out.println("Người dùng hủy thao tác.");
+								}
+							});
+
+				});
+			});
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
 	}
 
 	public void loadChatHistory(String userA, String userB) throws IOException {
-		List<ChatMessage> messages = socketClient.chatService.getAllMessages();
+		List<ChatMessage> messages = socketClient.chatService.getMessagesBetween(userA, userB);
 
 		System.out.println(messages);
 		if (messages != null && !messages.isEmpty()) {
+//			for (ChatMessage msg : messages) {
+//				boolean isSend = msg.getSenderId().equals(user.getIdHex());
+//				if (msg.getType().equalsIgnoreCase("file")) {
+//					Platform.runLater(() -> {
+//						try {
+//							renderFileMessage(msg, isSend);
+//						} catch (IOException e) {
+//							// TODO Auto-generated catch block
+//							e.printStackTrace();
+//						}
+//					});
+//				} else {					
+//					Platform.runLater(() -> {
+//						try {
+//							onSendAndReceiveMessenge(msg, isSend);
+//						} catch (IOException e) {
+//							// TODO Auto-generated catch block
+//							e.printStackTrace();
+//						}
+//					});
+//				}
+//			}
+
+			List<Node> rendered = new ArrayList<>();
+			String lastSenderId = null;
+
 			for (ChatMessage msg : messages) {
 				boolean isSend = msg.getSenderId().equals(user.getIdHex());
-				if (msg.getType().equalsIgnoreCase("file")) {
-					renderFileMessage(msg, isSend);
-				} else {
-					onSendAndReceiveMessenge(msg, isSend);
-				}
+				Node node = msg.getType().equalsIgnoreCase("file")
+						? MessageRender.renderFileMessage(msg, isSend, lastSenderId, redisUserService, socketClient)
+						: MessageRender.renderTextMessage(msg, isSend, lastSenderId, redisUserService);
+				lastSenderId = msg.getSenderId();
+				rendered.add(node);
 			}
+
+			Platform.runLater(() -> vboxInScroll.getChildren().addAll(rendered));
 		}
 	}
 }
