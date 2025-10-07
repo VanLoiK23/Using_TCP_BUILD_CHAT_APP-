@@ -93,7 +93,7 @@
          <children>
             <AnchorPane prefHeight="60.0" prefWidth="622.0">
                <children>
-                  <Circle fx:id="avatarUser" fill="#d3eaff" layoutX="33.0" layoutY="29.0" radius="19.0" stroke="BLACK" strokeType="INSIDE" />
+                  <Circle fx:id="avatarGroup" fill="#d3eaff" layoutX="33.0" layoutY="29.0" radius="19.0" stroke="BLACK" strokeType="INSIDE" />
                   <Circle fill="#00ff26" layoutX="47.0" layoutY="40.0" radius="5.0" stroke="#15ff00" strokeType="INSIDE" />
                   <FontAwesomeIcon glyphName="INFO_CIRCLE" layoutX="590.0" layoutY="37.0" onMouseClicked="#infoClick" size="1.5em" styleClass="icon_remove_text" text="" />
                </children>

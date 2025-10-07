@@ -94,6 +94,9 @@ public class ServerController implements Initializable {
 				packetRequest.setData(chatMessage);
 
 				socketClient.sendPacket(packetRequest);
+				
+				
+				messageTextGerneral.clear();
 			}
 		}
 	}
@@ -107,12 +110,20 @@ public class ServerController implements Initializable {
 
 	@FXML
 	void startServer(MouseEvent event) {
-		if (commonController.checkValidTextField(portNumberTextField)
-				&& commonController.checkValidTextField(maxNumberClientTextFileld)) {
+//		if (commonController.checkValidTextField(portNumberTextField)
+//				&& commonController.checkValidTextField(maxNumberClientTextFileld)) {
+//
+//			if (commonController.isValidNumber(portNumberTextField.getText())
+//					&& commonController.checkValidTextField(maxNumberClientTextFileld)) {
+//				PORT = Integer.parseInt(portNumberTextField.getText());
+//				MAX_CONNECT = Integer.parseInt(maxNumberClientTextFileld.getText());
+//			}
+//		}
+		
+		if (commonController.checkValidTextField(maxNumberClientTextFileld)) {
 
-			if (commonController.isValidNumber(portNumberTextField.getText())
-					&& commonController.checkValidTextField(maxNumberClientTextFileld)) {
-				PORT = Integer.parseInt(portNumberTextField.getText());
+			if (commonController.checkValidTextField(maxNumberClientTextFileld)) {
+				PORT = 12345;
 				MAX_CONNECT = Integer.parseInt(maxNumberClientTextFileld.getText());
 			}
 		}
@@ -180,6 +191,10 @@ public class ServerController implements Initializable {
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
+		
+		portNumberTextField.setVisible(false);
+		
+		messageTextGerneral.setWrapText(true);
 
 		SocketServer.setOnClientConnected(client -> {
 			if (client.getUserID() != null) {

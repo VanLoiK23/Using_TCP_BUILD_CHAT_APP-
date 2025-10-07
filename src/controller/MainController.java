@@ -65,6 +65,9 @@ public class MainController implements Initializable {
 	private String lastSenderId = null;
 
 	@FXML
+	private Circle avatarGroup;
+
+	@FXML
 	private Circle avatarUser;
 
 	@FXML
@@ -116,22 +119,23 @@ public class MainController implements Initializable {
 
 		Image image = new Image(user.getAvatarUrl(), true);
 
-		image.errorProperty().addListener((obs, oldVal, newVal) -> {
-			if (newVal) {
-				System.out.println("❌ Lỗi tải ảnh: " + user.getAvatarUrl());
-			}
-		});
-
 		image.progressProperty().addListener((obs, oldVal, newVal) -> {
 			if (newVal.doubleValue() == 1.0 && !image.isError()) {
-				Platform.runLater(() -> {
-					avatarUser.setFill(new ImagePattern(image));
-				});
+				avatarUser.setFill(new ImagePattern(image));
 			}
 		});
 
 		// load message from mongoDB
 		if (user != null) {
+			Image imageGroup = new Image("https://i.ibb.co/bgHSQX6K/download.png", true);
+			
+			imageGroup.progressProperty().addListener((obs, oldVal, newVal) -> {
+				if (newVal.doubleValue() == 1.0 && !imageGroup.isError()) {
+					avatarGroup.setFill(new ImagePattern(imageGroup));
+				}
+			});
+			
+			
 			Task<Void> loadTask = new Task<>() {
 				@Override
 				protected Void call() throws Exception {
@@ -317,7 +321,7 @@ public class MainController implements Initializable {
 		String fileName = fileData.getUrlUpload();
 		String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
 		boolean isImage = extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png");
-		
+
 		FXMLLoader loader = new FXMLLoader(getClass()
 				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
 		Node fileBubble = loader.load();
@@ -411,9 +415,9 @@ public class MainController implements Initializable {
 
 		FileRenderMessage controller = loader.getController();
 		// truyền dữ liệu vào controller
-		if(isImage) {
+		if (isImage) {
 			controller.setImagesLocal(file);
-		}else {
+		} else {
 			controller.setFileInfoLocal(file);
 		}
 
@@ -444,9 +448,9 @@ public class MainController implements Initializable {
 		List<FileChooser.ExtensionFilter> filters = new ArrayList<>();
 
 		if (isImage) {
-		    filters.add(new FileChooser.ExtensionFilter("Ảnh", "*.png", "*.jpg", "*.jpeg"));
+			filters.add(new FileChooser.ExtensionFilter("Ảnh", "*.png", "*.jpg", "*.jpeg"));
 		} else {
-		    filters.add(new FileChooser.ExtensionFilter("Tất cả file", "*.*"));
+			filters.add(new FileChooser.ExtensionFilter("Tất cả file", "*.*"));
 			filters.add(new FileChooser.ExtensionFilter("Tài liệu", "*.pdf", "*.docx", "*.txt"));
 		}
 
@@ -470,7 +474,7 @@ public class MainController implements Initializable {
 			if (socketClient.checkRunningServer()) {
 				socketClient.sendFile(selectedFile, user.getIdHex(), "all");
 
-				renderLocalFileMessage(selectedFile,isImage);
+				renderLocalFileMessage(selectedFile, isImage);
 			} else {
 				commonController.alertInfo(AlertType.WARNING, "Establieshed to server is fail", "Can't send " + word);
 				socketClient.reConnectToServer();
@@ -508,7 +512,6 @@ public class MainController implements Initializable {
 		setActiveSelect("all");
 
 		assignActiveSelect(getActiveSelect());
-		avatarUser.setVisible(false);
 
 		clear.setVisible(false);
 
@@ -574,6 +577,17 @@ public class MainController implements Initializable {
 
 								} else {
 									System.out.println("Người dùng hủy thao tác.");
+									
+									Platform.runLater(() -> {
+										try {
+											commonController.loaderToResource(container_chat,
+													"LoginAndRegister/FormLoginAndRegister");
+//											socketClient.reConnectToServer();
+
+										} catch (IOException e) {
+											e.printStackTrace();
+										}
+									});
 								}
 							});
 

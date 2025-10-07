@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
@@ -76,14 +77,17 @@ public class UserService {
 		return imageUrl;
 	}
 
-	public User getUserById(Integer userId) {
-//		 Bson bsonFilter = Filters.eq("name", "Troy");
-
-		Document doc = userCollection.find(eq("id", userId)).first();
-		if (doc != null) {
-			return gson.fromJson(doc.toJson(), User.class);
-		}
-		return null;
+	public User getUserById(String userId) {
+	    try {
+	        ObjectId objectId = new ObjectId(userId); // chuyển chuỗi sang ObjectId
+	        Document doc = userCollection.find(eq("_id", objectId)).first();
+	        if (doc != null) {
+	            return gson.fromJson(doc.toJson(), User.class);
+	        }
+	    } catch (IllegalArgumentException e) {
+	        System.out.println("ID không hợp lệ: " + userId);
+	    }
+	    return null;
 	}
 
 	public User getUserByUserName(String username) {

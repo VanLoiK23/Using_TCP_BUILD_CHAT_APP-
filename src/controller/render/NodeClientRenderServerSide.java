@@ -7,11 +7,15 @@ import javafx.scene.image.Image;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.ImagePattern;
 import javafx.scene.shape.Circle;
+import model.User;
 import service.RedisUserService;
+import service.UserService;
 import util.RedisUtil;
 
 public class NodeClientRenderServerSide {
 	private RedisUserService redisUserService = new RedisUserService(RedisUtil.getClient());
+
+	private UserService userService = new UserService();
 
 	@FXML
 	private Label IPClient;
@@ -37,6 +41,14 @@ public class NodeClientRenderServerSide {
 
 			String urlAvatar = redisUserService.getCachedAvatar(client.getUserID());
 			String userName = redisUserService.getCachedUsername(client.getUserID());
+
+			//chưa được lưu trong redis
+			if (urlAvatar == null) {
+				User user = userService.getUserById(client.getUserID());
+
+				urlAvatar = user.getAvatarUrl();
+				userName = user.getUsername();
+			}
 
 			System.out.println("Client id :" + client.getUserID());
 

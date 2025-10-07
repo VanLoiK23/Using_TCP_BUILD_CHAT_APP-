@@ -197,11 +197,12 @@ public class SocketServer implements Runnable {
 							this.userID = user.getIdHex();
 							if (RedisUtil.isAlive()) {
 								redisOnlineService.setUserOnline(this.userID);
+								
+								// only login success
+								if (onClientConnected != null) {
+									onClientConnected.accept(this);
+								}
 							}
-						}
-						// only login success
-						if (onClientConnected != null) {
-							onClientConnected.accept(this);
 						}
 
 						sendSelfClient(loginResponse);

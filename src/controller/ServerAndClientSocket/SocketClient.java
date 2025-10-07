@@ -29,9 +29,9 @@ public class SocketClient {
 	private Socket socket;
 	private DataOutputStream out;
 	private DataInputStream in;
-	public Gson gson = Converters.registerAll(new GsonBuilder()).setDateFormat("EEE MMM dd HH:mm:ss z yyyy").create();;
+	public Gson gson = Converters.registerAll(new GsonBuilder()).setDateFormat("EEE MMM dd HH:mm:ss z yyyy").create();
 //	private OutputStream outputStream;
-	private static final String SERVER = "192.168.1.212";// IP server
+	private static final String SERVER = "192.168.1.220";// IP server
 	private static final int PORT = 12345;
 	private Consumer<ChatMessage> messageHandler;
 	private Consumer<ChatMessage> fileMessageHandler;
