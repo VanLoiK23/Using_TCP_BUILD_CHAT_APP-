@@ -1,0 +1,16 @@
+/* JavaFX CSS - Leave this comment until you have at least create one rule which uses -fx-Property */
+.group-item {
+    -fx-background-color: white;
+    -fx-cursor: hand;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 4;
+}
+
+.group-item:hover {
+    -fx-background-color: #E3F2FD; /* xanh nhạt khi hover */
+}
+
+.group-item:selected, .group-item:focused {
+    -fx-background-color: #BBDEFB; /* xanh đậm khi click chọn */
+}

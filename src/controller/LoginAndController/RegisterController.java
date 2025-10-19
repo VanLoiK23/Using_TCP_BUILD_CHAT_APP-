@@ -191,17 +191,28 @@ public class RegisterController implements Initializable {
 											parentController.open_signin(null);
 
 										} else {
-											commonController.alertInfo(Alert.AlertType.ERROR, "Lỗi!",
-													"Không thể tạo tài khoản. Vui lòng thử lại.");
+
+											Platform.runLater(() -> {
+												setDefault();
+												commonController.alertInfo(Alert.AlertType.ERROR, "Lỗi!",
+														"Không thể tạo tài khoản. Vui lòng thử lại.");
+											});
 										}
 									});
 								} else if (packetReponse.getType().equals("DUPLICATE_UserName")) {
-									commonController.alertInfo(AlertType.INFORMATION, "Không thể tạo tài khoản!!!!",
-											"Tên đã được sử dụng!");
+									Platform.runLater(() -> {
+										setDefault();
+										commonController.alertInfo(AlertType.INFORMATION, "Không thể tạo tài khoản!!!!",
+												"Tên đã được sử dụng!");
+									});
 								}
 							} else {
-								commonController.alertInfo(AlertType.ERROR, "Cảnh báo!!!!",
-										"Không nhận được phản hồi nào từ server!");
+
+								Platform.runLater(() -> {
+									setDefault();
+									commonController.alertInfo(AlertType.ERROR, "Cảnh báo!!!!",
+											"Không nhận được phản hồi nào từ server!");
+								});
 							}
 						}
 					} else {

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+
+
+<AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="473.0" prefWidth="368.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.render.InfoGroup">
+   <children>
+      <Text layoutX="81.0" layoutY="26.0" strokeType="OUTSIDE" strokeWidth="0.0" text="Thông tin về ">
+         <font>
+            <Font name="Great Vibes Regular" size="23.0" />
+         </font>
+      </Text>
+      <Text fx:id="nameGroup" layoutX="184.0" layoutY="25.0" strokeType="OUTSIDE" strokeWidth="0.0" text="Nhóm">
+         <font>
+            <Font name="Great Vibes Regular" size="23.0" />
+         </font>
+      </Text>
+      <Text layoutX="24.0" layoutY="57.0" strokeType="OUTSIDE" strokeWidth="0.0" text="Địa chỉ MultiCast của Nhóm:">
+         <font>
+            <Font name="Times New Roman" size="15.0" />
+         </font>
+      </Text>
+      <Text fx:id="ipGroup" layoutX="210.0" layoutY="56.0" strokeType="OUTSIDE" strokeWidth="0.0" text="192.0.0.0.0">
+         <font>
+            <Font name="Times New Roman Bold" size="15.0" />
+         </font>
+      </Text>
+      <Text layoutX="24.0" layoutY="95.0" strokeType="OUTSIDE" strokeWidth="0.0" text="Danh sách người dùng trong nhóm">
+         <font>
+            <Font name="Times New Roman" size="15.0" />
+         </font>
+      </Text>
+      <ScrollPane fx:id="scrollPane" layoutX="24.0" layoutY="109.0" prefHeight="353.0" prefWidth="330.0">
+         <content>
+            <VBox fx:id="vBoxInScroll" prefHeight="351.0" prefWidth="320.0" />
+         </content>
+      </ScrollPane>
+   </children>
+</AnchorPane>

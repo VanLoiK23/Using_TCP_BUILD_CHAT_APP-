@@ -65,7 +65,7 @@ public class LoginController implements Initializable {
 			if (socketClient.getInstance().responseQueue != null) {
 
 				try {
-					packetReponse = socketClient.getInstance().responseQueue.poll(5, TimeUnit.SECONDS);
+					packetReponse = socketClient.getInstance().responseQueue.poll(10, TimeUnit.SECONDS);
 
 					if (packetReponse != null) {
 
@@ -124,26 +124,26 @@ public class LoginController implements Initializable {
 		try {
 			socketClient = SocketClient.getInstance();
 			
-			socketClient.setOnServerDisconnected(reason -> {
-				Platform.runLater(() -> {
-
-					commonController.alertInfo(AlertType.WARNING, "❌ Server disconnected", reason);
-
-					
-					commonController.alertConfirm("Kết nối lại SERVER", "Bạn có chắc muốn kết nối lại với Server hay không?", confirmed -> {
-					    if (confirmed) {
-					    	try {
-								socketClient.reConnectToServer();
-							} catch (InterruptedException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-					    } else {
-					        System.out.println("Người dùng hủy thao tác.");
-					    }
-					});								
-				});
-			});
+//			socketClient.setOnServerDisconnected(reason -> {
+//				Platform.runLater(() -> {
+//
+//					commonController.alertInfo(AlertType.WARNING, "❌ Server disconnected", reason);
+//
+//					
+//					commonController.alertConfirm("Kết nối lại SERVER", "Bạn có chắc muốn kết nối lại với Server hay không?", confirmed -> {
+//					    if (confirmed) {
+//					    	try {
+//								socketClient.reConnectToServer();
+//							} catch (InterruptedException e) {
+//								// TODO Auto-generated catch block
+//								e.printStackTrace();
+//							}
+//					    } else {
+//					        System.out.println("Người dùng hủy thao tác.");
+//					    }
+//					});								
+//				});
+//			});
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

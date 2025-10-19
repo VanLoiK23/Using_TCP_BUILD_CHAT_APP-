@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+
+
+<Pane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="62.0" prefWidth="367.0" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.render.NodeUserInListUser">
+   <children>
+      <RadioButton fx:id="radioCustomer" layoutX="14.0" layoutY="23.0" mnemonicParsing="false" onAction="#isSelect" prefHeight="18.0" prefWidth="16.0" style="-fx-text-fill: blue;" />
+      <Text fx:id="nameNode" layoutX="100.0" layoutY="36.0" strokeType="OUTSIDE" strokeWidth="0.0" text="Đức Phúc" wrappingWidth="252.5445098876953">
+         <font>
+            <Font name="Times New Roman" size="17.0" />
+         </font>
+      </Text>
+      <Circle fx:id="avatarNode" fill="DODGERBLUE" layoutX="64.0" layoutY="31.0" radius="21.0" stroke="BLACK" strokeType="INSIDE" />
+   </children>
+</Pane>

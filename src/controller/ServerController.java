@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -16,10 +18,13 @@ import controller.Common.CommonController;
 import controller.ServerAndClientSocket.SocketClient;
 import controller.ServerAndClientSocket.SocketServer;
 import controller.render.NodeClientRenderServerSide;
+import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
@@ -29,7 +34,9 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import model.ChatMessage;
 import model.Packet;
 
@@ -140,6 +147,9 @@ public class ServerController implements Initializable {
 			startServer();
 			commonController.alertInfo(AlertType.INFORMATION, "Server đã được khởi tạo",
 					"Server chạy trên port " + PORT);
+			
+			renderLogging("Server chạy trên PORT " + PORT, "INFO");
+
 		}
 	}
 
@@ -186,6 +196,9 @@ public class ServerController implements Initializable {
 			clearNodeClient();
 
 			commonController.alertInfo(AlertType.INFORMATION, "Server đã tắt", "Server đã ngừng chạy ");
+			
+			renderLogging("Server đã tắt","INFO");
+
 		}
 	}
 
@@ -213,6 +226,13 @@ public class ServerController implements Initializable {
 				});
 			}
 		});
+		
+		SocketServer.setOnLogging(logging -> {
+			Platform.runLater(() -> {
+				renderLogging(logging.getMessage(),logging.getType());
+			});
+
+		});
 
 		vBoxInScrollList.heightProperty().addListener((obs, oldVal, newVal) -> {
 			scrolListClient.setVvalue(1.0);
@@ -224,6 +244,49 @@ public class ServerController implements Initializable {
 
 	}
 
+	
+	private void renderLogging(String message, String type) {
+	    // type "INFO", "ERROR", "WARNING"
+	    HBox logRow = new HBox(10);
+	    logRow.setAlignment(Pos.CENTER_LEFT);
+	    logRow.setPadding(new Insets(4));
+	    logRow.setStyle("-fx-background-color: #1e1e1e; -fx-background-radius: 6;");
+
+	    FontAwesomeIcon icon = new FontAwesomeIcon();
+	    switch (type.toUpperCase()) {
+	        case "ERROR":
+	            icon.setGlyphName("EXCLAMATION_TRIANGLE");
+	            icon.setFill(Color.RED);
+	            break;
+	        case "WARNING":
+	            icon.setGlyphName("EXCLAMATION_CIRCLE");
+	            icon.setFill(Color.ORANGE);
+	            break;
+	        default:
+	            icon.setGlyphName("INFO_CIRCLE");
+	            icon.setFill(Color.LIGHTBLUE);
+	    }
+	    icon.setSize("16");
+
+	    String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+	    Label timeLabel = new Label("[" + time + "]");
+	    timeLabel.setTextFill(Color.GRAY);
+	    timeLabel.setStyle("-fx-font-size: 12; -fx-font-family: Consolas;");
+
+	    // message
+	    Label msgLabel = new Label(message);
+	    msgLabel.setWrapText(true);
+	    msgLabel.setTextFill(Color.WHITE);
+	    msgLabel.setStyle("-fx-font-size: 13; -fx-font-family: 'Segoe UI';");
+
+	    logRow.getChildren().addAll(icon, timeLabel, msgLabel);
+
+	    Platform.runLater(() -> {
+	        vBoxInScrollLog.getChildren().add(logRow);
+	    });
+	}
+
+	
 	private void addClientNode(SocketServer client) {
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/clientNodeServerSide.fxml"));

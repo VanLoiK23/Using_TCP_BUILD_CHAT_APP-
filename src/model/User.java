@@ -62,6 +62,7 @@ package model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.Objects;
 
 import org.bson.Document;
 
@@ -126,5 +127,18 @@ public class User {
 
     public String getIdHex() {
         return _id != null ? _id.oid : null;
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true; // cùng object
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return Objects.equals(getIdHex(), user.getIdHex()); // so sánh theo id
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getIdHex());
     }
 }

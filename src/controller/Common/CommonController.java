@@ -6,12 +6,15 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javafx.event.ActionEvent;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
@@ -72,6 +75,25 @@ public class CommonController {
 	    callback.accept(confirmed);
 	}
 
+	public void onExit(Button btEx) {
+	    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+	    alert.setTitle("Xác nhận");
+	    alert.setHeaderText("Bạn có chắc muốn hủy tạo nhóm không?");
+	    alert.setContentText("Mọi dữ liệu chưa lưu sẽ bị mất.");
+
+	    ButtonType okButton = new ButtonType("Thoát", ButtonBar.ButtonData.OK_DONE);
+	    ButtonType cancelButton = new ButtonType("Hủy", ButtonBar.ButtonData.CANCEL_CLOSE);
+	    alert.getButtonTypes().setAll(okButton, cancelButton);
+
+	    // Hiển thị và lấy kết quả
+	    alert.showAndWait().ifPresent(response -> {
+	        if (response == okButton) {
+	            // Đóng cửa sổ hiện tại
+	            Stage stage = (Stage) btEx.getScene().getWindow();
+	            stage.close();
+	        }
+	    });
+	}
 
 	
 	public boolean isValidEmail(String email) {

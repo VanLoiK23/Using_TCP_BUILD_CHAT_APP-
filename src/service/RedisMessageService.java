@@ -10,17 +10,19 @@ public class RedisMessageService {
 		this.jedisPooled = jedisPooled;
 	}
 
-	public void pushRecentMessage(String messageJson) {
-		jedisPooled.lpush("chat:recent", messageJson);// catch message
-		jedisPooled.ltrim("chat:recent", 0, 49); // giữ 50 tin nhắn gần nhất
+	public void pushRecentMessage(String idGroup_User, String messageJson) {
+		jedisPooled.lpush("chat:recent"+idGroup_User, messageJson);// catch message
+		jedisPooled.ltrim("chat:recent"+idGroup_User, 0, 49); // giữ 50 tin nhắn gần nhất
 	}
 
-	public String getLatestMessage() {
-		return jedisPooled.lindex("chat:recent", 0);
+	public String getLatestMessage(String idGroup_User) {
+	    String msg = jedisPooled.lindex("chat:recent" + idGroup_User, 0);
+	    return msg != null ? msg : "";
 	}
+
 
 	// Pub/Sub realtime
-	//danh cho channel rieng phu hop cho 1 nhom
+	// danh cho channel rieng phu hop cho 1 nhom
 	public void publishMessage(String channel, String messageJson) {
 		jedisPooled.publish(channel, messageJson);
 	}
