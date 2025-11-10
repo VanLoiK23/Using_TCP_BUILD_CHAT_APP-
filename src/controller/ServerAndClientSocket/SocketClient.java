@@ -7,11 +7,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.SocketException;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -29,6 +34,7 @@ import model.ChatMessage;
 import model.FileInfo;
 import model.Packet;
 import model.User;
+import redis.clients.jedis.JedisPubSub;
 import service.ChatService;
 import service.GroupService;
 import service.RedisMessageService;
@@ -42,12 +48,13 @@ public class SocketClient {
 	private DataInputStream in;
 	public Gson gson = Converters.registerAll(new GsonBuilder()).setDateFormat("EEE MMM dd HH:mm:ss z yyyy").create();
 //	private OutputStream outputStream;
-	private static final String SERVER = "192.168.1.98";// IP server
+	private static final String SERVER = "192.168.1.52";// IP server
 	private static final int PORT = 12345;
 	private static final int PORT_GROUP = 5000;
 	private Consumer<ChatMessage> messageHandler;
 	private Consumer<ChatMessage> fileMessageHandler;
 	private Consumer<String> onServerDisconnected;
+	private Consumer<String> onUserLeaveJoinGroup;
 	public BlockingQueue<Packet> responseQueue;
 	public BlockingQueue<Packet> responseCreateGRQueue;
 	public BlockingQueue<Packet> responseJoinGRQueue;
@@ -226,8 +233,68 @@ public class SocketClient {
 		this.onServerDisconnected = handler;
 	}
 
+	public void setOnUserLeaveJoin(Consumer<String> handler) {
+		this.onUserLeaveJoinGroup = handler;
+	}
+
 	// receive difference message from other client
 	private void listenForMessages() {
+		if (listenerThread == null || !listenerThread.isAlive()) {
+			listenerThread = new Thread(() -> {
+
+				try {
+					String msg;
+					while ((msg = in.readUTF()) != null) {
+						Packet packet = gson.fromJson(msg, Packet.class);
+
+						System.out.println("Response: DM" + packet);
+						if (packet.getType().equals("MESSAGE")) {
+
+							ChatMessage chatMessage = gson.fromJson(gson.toJson(packet.getData()), ChatMessage.class);
+
+							if (instance.messageHandler != null) {
+								instance.messageHandler.accept(chatMessage);
+							}
+						} else if (packet.getType().equals("FILE_UPLOAD_RESULT")) {
+							ChatMessage chatMessage = gson.fromJson(gson.toJson(packet.getData()), ChatMessage.class);
+
+							if (instance.fileMessageHandler != null) {
+								instance.fileMessageHandler.accept(chatMessage);
+							}
+						} else if (packet.getType().equals("PONG")) {
+							instance.heartbeatQueue.offer(packet);
+
+							System.out.println("[DEBUG] Received PONG packet: " + packet);
+
+						} else if (packet.getType().equals("CREATE_RESULT")) {
+							instance.responseCreateGRQueue.offer(packet);
+						} else if (packet.getType().equals("JOIN_RESULT")) {
+							instance.responseJoinGRQueue.offer(packet);
+						} else if (packet.getType().equals("LEAVE_RESULT")) {
+							instance.responseLeftGRQueue.offer(packet);
+						} else if (packet.getType().equals("USER_JoinOrLeave")) {
+							if (onUserLeaveJoinGroup != null) {
+								onUserLeaveJoinGroup.accept((String) packet.getData());
+							}
+						} else {
+							instance.responseQueue.offer(packet);
+						}
+
+					}
+				} catch (EOFException e) {
+					e.printStackTrace();
+					notifyServerDisconnected("Server closed the connection.");
+				} catch (SocketException e) {
+					e.printStackTrace();
+					notifyServerDisconnected("Connection lost: " + e.getMessage());
+				} catch (IOException e) {
+					e.printStackTrace();
+					notifyServerDisconnected("IO error: " + e.getMessage());
+				}
+			});
+			listenerThread.start();
+		}
+
 		if (in == null || listenerThread != null && listenerThread.isAlive()) {
 			System.out.println("Response: OK ");
 			return;
@@ -285,6 +352,9 @@ public class SocketClient {
 		listenerThread.start();
 	}
 
+	JedisPubSub listener;
+	private static final Set<String> processedMessageIds = new HashSet<>();
+
 	private void listeningMessageGroup() {
 		Thread receiveThread = new Thread(() -> {
 			byte[] buffer = new byte[4096];
@@ -312,12 +382,65 @@ public class SocketClient {
 						}
 					}
 				} catch (IOException e) {
-					multicastSocket.close();
-					break;
+//					multicastSocket.close();
+//					break;
+
+					e.printStackTrace();
 				}
 			}
 		});
 		receiveThread.start();
+
+		if (listener == null) {
+			listener = new JedisPubSub() {
+				{
+					System.out.println("[DEBUG] Listener created: " + this.hashCode());
+				}
+
+				@Override
+				public void onMessage(String channel, String msg) {
+					System.out.println("[DEBUG] onMessage called by thread: " + Thread.currentThread().getName());
+
+					if (msg != null && !msg.isEmpty()) {
+						Packet packet = gson.fromJson(msg, Packet.class);
+
+						if (packet.getType().equals("MESSAGE")) {
+
+							ChatMessage chatMessage = gson.fromJson(gson.toJson(packet.getData()), ChatMessage.class);
+
+							String messageId = chatMessage.getTimestamp() + "_" + chatMessage.getSenderId();
+
+							if (!processedMessageIds.contains(messageId)) {
+								System.out.println("Message: " + chatMessage);
+
+								chatService.saveMessage(chatMessage);
+								if (instance.messageHandler != null) {
+									instance.messageHandler.accept(chatMessage);
+								}
+								processedMessageIds.add(messageId);
+							} else {
+								System.out.println("[DEBUG] Bỏ qua tin trùng: " + messageId);
+							}
+
+						}
+					}
+				}
+			};
+
+			subscribeToChannel("group-chat", listener);
+		}
+	}
+
+	private boolean isSubscribed = false;
+
+	public void subscribeToChannel(String channel, JedisPubSub listener) {
+		if (isSubscribed) {
+			System.out.println("[DEBUG] Đã subscribe rồi, bỏ qua");
+			return;
+		}
+		isSubscribed = true;
+		System.out.println("[DEBUG] Subscribing to channel: " + channel);
+		new Thread(() -> redisMessageService.subscribeToChannel(channel, listener)).start();
 	}
 
 	public void sendMessageGroup(Packet packetRequest, InetAddress address) throws IOException {
@@ -327,8 +450,11 @@ public class SocketClient {
 //			sendPacket(packetRequest);
 			DatagramPacket packet = new DatagramPacket(data, data.length, address, PORT_GROUP);
 
+			multicastSocket.setTimeToLive(128);
 			System.out.println("Datagram send " + packet + " multicast " + address);
 			multicastSocket.send(packet);
+
+//			redisMessageService.publishMessage("group-chat", gson.toJson(packetRequest));
 		} catch (Exception e) {
 			multicastSocket.leaveGroup(address);
 			multicastSocket.close();
@@ -342,22 +468,74 @@ public class SocketClient {
 			return;
 		}
 
-		multicastSocket.joinGroup(address);
+		NetworkInterface ni = null;
+
+		if (ni == null) {
+			ni = findSuitableNetworkInterface();
+			if (ni == null) {
+				throw new IOException("Không tìm thấy giao diện mạng phù hợp hỗ trợ multicast.");
+			}
+		}
+
+		multicastSocket.setReuseAddress(true);
+		multicastSocket.setNetworkInterface(ni);
+		multicastSocket.joinGroup(new InetSocketAddress(address, PORT_GROUP), ni);
+
+		System.out.println(
+				"[INFO] Đã tham gia nhóm multicast thành công: " + address + " trên giao diện: " + ni.getDisplayName());
+
+//		multicastSocket.joinGroup(address);
 		joinedGroups.add(address);
 		hashMapLeaveGroup.put(address, false);
+
+		System.out.println("Join group: " + address + " on " + multicastSocket.getInterface());
+
 		System.out.println("Tham gia nhóm multicast thành công: " + address);
 	}
 
-	public void MuteGroup(InetAddress address,Boolean isLeave) throws IOException {
+	private NetworkInterface findSuitableNetworkInterface() throws SocketException {
+		Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+		for (NetworkInterface ni : Collections.list(interfaces)) {
+			try {
+				// Bỏ qua các giao diện ảo của VMware/VirtualBox theo tên nếu cần
+				String displayName = ni.getDisplayName().toLowerCase();
+				if (displayName.contains("vmnet") || displayName.contains("virtualbox")) {
+					continue; // Bỏ qua giao diện này, chuyển sang giao diện khác
+				}
+
+				if (ni.isUp() && !ni.isLoopback() && ni.supportsMulticast()) {
+					for (InetAddress addr : Collections.list(ni.getInetAddresses())) {
+						if (addr instanceof Inet4Address) {
+							System.out.println("[INFO] Tìm thấy giao diện phù hợp: " + ni.getDisplayName()
+									+ " với địa chỉ: " + addr.getHostAddress());
+							return ni; // Lấy giao diện vật lý/WiFi thật
+						}
+					}
+				}
+			} catch (SocketException e) {
+				System.err.println(
+						"[CẢNH BÁO] Lỗi khi kiểm tra giao diện " + ni.getDisplayName() + ": " + e.getMessage());
+			}
+		}
+		System.err.println("[CẢNH BÁO] Không tìm thấy giao diện phù hợp tự động. Hãy chỉ định thủ công nếu cần.");
+		return null;
+	}
+
+	public void MuteGroup(InetAddress address, Boolean isLeave) throws IOException {
 		if (joinedGroups.contains(address)) {
 			joinedGroups.remove(address);
 		}
-		
 
 		multicastSocket.leaveGroup(address);
-		if(isLeave) {
+
+//		if (listener != null) {
+//		    listener.unsubscribe();
+//		    System.out.println("[INFO] Đã rời khỏi nhóm group-chat");
+//		}
+
+		if (isLeave) {
 			hashMapLeaveGroup.remove(address);
-		}else {
+		} else {
 			hashMapLeaveGroup.put(address, true);
 		}
 	}

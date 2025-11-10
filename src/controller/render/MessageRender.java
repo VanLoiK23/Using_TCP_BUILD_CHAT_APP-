@@ -103,6 +103,22 @@ public class MessageRender {
 
         return messageBox;
     }
+    
+    public static Node renderSystemNotice(String content) {
+        Label noticeLabel = new Label(content);
+        noticeLabel.setStyle(
+            "-fx-text-fill: gray;" +
+            "-fx-font-style: italic;" +
+            "-fx-font-size: 13px;" +
+            "-fx-background-color: transparent;"
+        );
+
+        HBox noticeBox = new HBox(noticeLabel);
+        noticeBox.setAlignment(Pos.CENTER);
+        noticeBox.setPadding(new Insets(10, 0, 10, 0));
+
+        return noticeBox;
+    }
 
     public static Node renderFileMessage(ChatMessage chatMessage, boolean isSend, String lastSenderId, RedisUserService redisUserService, SocketClient socketClient) throws IOException {
         FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);

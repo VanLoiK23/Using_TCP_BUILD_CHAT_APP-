@@ -97,12 +97,10 @@ package controller.ServerAndClientSocket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.MulticastSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,7 +170,7 @@ public class SocketServer implements Runnable {
 
 			clients.add(this); // thêm client vào danh sách
 			updateHashMap();
-			
+
 			this.clientIP = socket.getInetAddress().toString();
 			System.out.println("Client connected: " + socket.getInetAddress());
 		} catch (IOException e) {
@@ -309,12 +307,11 @@ public class SocketServer implements Runnable {
 					break;
 				}
 				case "JOIN_GROUP": {
-					setLogging("Yêu cầu: JOIN GROUP từ " + socket.getInetAddress() + ":" + socket.getPort(),
-							"INFO");
-					
+					setLogging("Yêu cầu: JOIN GROUP từ " + socket.getInetAddress() + ":" + socket.getPort(), "INFO");
+
 					Group group = gson.fromJson(gson.toJson(packet.getData()), Group.class);
 
-					Group groupAdjusted = updateListMember(group,true);
+					Group groupAdjusted = updateListMember(group, true);
 
 					GroupHandler groupHandler = new GroupHandler();
 					groupHandler.updateGroup(groupAdjusted, groupService);
@@ -324,54 +321,73 @@ public class SocketServer implements Runnable {
 					Packet packetResponse = new Packet();
 					packetResponse.setType("JOIN_RESULT");
 					packetResponse.setData(true);
-					
-					setLogging("Phản hồi: JOIN GROUP từ " + socket.getInetAddress() + ":" + socket.getPort()+ " :" + "SUCCESS",
-							"INFO");
+
+					setLogging("Phản hồi: JOIN GROUP từ " + socket.getInetAddress() + ":" + socket.getPort() + " :"
+							+ "SUCCESS", "INFO");
 
 					sendSelfClient(packetResponse);
+
+					// only send to online user in group INFO JOIN GR
+					Packet packetResponseToGR = new Packet();
+					packetResponseToGR.setType("USER_JoinOrLeave");
+					packetResponseToGR.setData(this.userID + "_" + group.getIdHex());
+
+					String messageInfo = gson.toJson(packetResponseToGR);
+
+					broadcastToGroup(messageInfo, group.getMembers());
 
 					break;
 				}
 				case "LEAVE_GROUP": {
 					Group group = gson.fromJson(gson.toJson(packet.getData()), Group.class);
 
-					Group groupAdjusted = updateListMember(group,false);
+					Group groupAdjusted = updateListMember(group, false);
 
-					setLogging("Yêu cầu: LEAVE GROUP từ " + socket.getInetAddress() + ":" + socket.getPort(),
-							"INFO");
-					
+					setLogging("Yêu cầu: LEAVE GROUP từ " + socket.getInetAddress() + ":" + socket.getPort(), "INFO");
+
 					GroupHandler groupHandler = new GroupHandler();
 					groupHandler.updateGroup(groupAdjusted, groupService);
 
 //					updateListMember(group);
 
+					// response user leave group
 					Packet packetResponse = new Packet();
 					packetResponse.setType("LEAVE_RESULT");
 					packetResponse.setData(true);
 
-					setLogging("Phản hồi: LEAVE GROUP từ " + socket.getInetAddress() + ":" + socket.getPort()+ " :" + "SUCCESS",
-							"INFO");
-					
+					setLogging("Phản hồi: LEAVE GROUP từ " + socket.getInetAddress() + ":" + socket.getPort() + " :"
+							+ "SUCCESS", "INFO");
+
 					sendSelfClient(packetResponse);
+
+					// only send to online user in group INFO LEAVE GR
+					Packet packetResponseToGR = new Packet();
+					packetResponseToGR.setType("USER_JoinOrLeave");
+					packetResponseToGR.setData(this.userID + "_" + group.getIdHex());
+
+					String messageInfo = gson.toJson(packetResponseToGR);
+
+					broadcastToGroup(messageInfo, group.getMembers());
 
 					break;
 				}
 				case "MESSAGE_PRIVATE": {
 					ChatMessage chatMessage = gson.fromJson(gson.toJson(packet.getData()), ChatMessage.class);
-					
-					setLogging("Yêu cầu: SEND TEXT TO PRIVATE từ " + socket.getInetAddress() + ":" + socket.getPort()+" tới "+getIPClient(chatMessage.getReceiverId()),
-							"INFO");
+
+					setLogging("Yêu cầu: SEND TEXT TO PRIVATE từ " + socket.getInetAddress() + ":" + socket.getPort()
+							+ " tới " + getIPClient(chatMessage.getReceiverId()), "INFO");
 
 					MessageHandler messageHandler = new MessageHandler(chatService, gson);
-					
+
 					packet.setType("MESSAGE");
-					
+
 					if (messageHandler.handleSave(packet)) {
-						sendPrivate(gson.toJson(packet),chatMessage.getReceiverId()); // gửi cho client khác cụ thể
+						sendPrivate(gson.toJson(packet), chatMessage.getReceiverId()); // gửi cho client khác cụ thể
 					}
 
 					setLogging("Phản hồi tới yêu cầu SEND TEXT TO PRIVATE từ " + socket.getInetAddress() + ":"
-							+ socket.getPort()+" tới "+getIPClient(chatMessage.getReceiverId()) + " :" + "SUCCESS", "INFO");
+							+ socket.getPort() + " tới " + getIPClient(chatMessage.getReceiverId()) + " :" + "SUCCESS",
+							"INFO");
 
 					break;
 				}
@@ -406,6 +422,28 @@ public class SocketServer implements Runnable {
 		System.out.println("Sent " + packet);
 	}
 
+	private void broadcastToGroup(String message, List<String> groupMembers) {
+		Set<String> memberSet = new HashSet<>(groupMembers);
+
+		for (SocketServer client : clients) {
+			String targetId = client.getUserID();
+
+			if (targetId != null && memberSet.contains(targetId)) {
+				if (!targetId.equals(this.userID)) { // không gửi cho chính mình
+					try {
+						if (client.socket.isClosed())
+							continue;
+
+						client.out.writeUTF(message);
+						client.out.flush();
+					} catch (IOException e) {
+						client.close();
+					}
+				}
+			}
+		}
+	}
+
 	// Gửi tin nhắn cho tất cả client trong Vector
 	private void broadcast(String message) {
 		for (SocketServer client : clients) {
@@ -424,27 +462,28 @@ public class SocketServer implements Runnable {
 			}
 		}
 	}
-	
+
 	private void sendPrivate(String message, String targetUserId) {
-	    for (SocketServer client : clients) {
-	        if (client == null || client.getUserID() == null) continue;
+		for (SocketServer client : clients) {
+			if (client == null || client.getUserID() == null)
+				continue;
 
-	        if (client.getUserID().equals(targetUserId)) {
-	            try {
-	                if (client.socket.isClosed()) return;
+			if (client.getUserID().equals(targetUserId)) {
+				try {
+					if (client.socket.isClosed())
+						return;
 
-	                client.out.writeUTF(message);
-	                client.out.flush();
-	                
-	        		System.out.println("Sent succes" + message);
+					client.out.writeUTF(message);
+					client.out.flush();
 
+					System.out.println("Sent succes" + message);
 
-	            } catch (IOException e) {
-	                client.close();
-	            }
-	            return;
-	        }
-	    }
+				} catch (IOException e) {
+					client.close();
+				}
+				return;
+			}
+		}
 
 //	    // Nếu không tìm thấy người nhận
 //	    try {
@@ -455,16 +494,15 @@ public class SocketServer implements Runnable {
 //	    }
 	}
 
-	
 	private String getIPClient(String userId) {
 		for (SocketServer client : clients) {
 			if (client.getUserID() != null) {
-				if(client.getUserID().equals(userId)) {
+				if (client.getUserID().equals(userId)) {
 					return client.clientIP;
 				}
 			}
 		}
-		
+
 		return null;
 	}
 
@@ -512,7 +550,7 @@ public class SocketServer implements Runnable {
 		}
 	}
 
-	private Group updateListMember(Group group,Boolean isJoin) {
+	private Group updateListMember(Group group, Boolean isJoin) {
 		Group targetGroup = groupHashMap.get(group.getMulticastIP());
 		if (targetGroup != null) {
 			List<String> members = targetGroup.getMembers();
@@ -521,12 +559,12 @@ public class SocketServer implements Runnable {
 				targetGroup.setMembers(members);
 			}
 
-			if(isJoin) {
+			if (isJoin) {
 				if (!members.contains(this.userID)) { // tránh trùng thành viên
 					members.add(this.userID);
 					System.out.println("Thêm user " + this.userID + " vào nhóm " + group.getMulticastIP());
 				}
-			}else {
+			} else {
 				members.remove(this.userID);
 			}
 

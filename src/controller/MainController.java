@@ -314,8 +314,8 @@ public class MainController implements Initializable {
 
 			node.setOnMouseClicked(e -> {
 				switchConversation(new ChatContext(ConversationType.PRIVATE, us.getIdHex()), us.getUsername(),
-						us.getAvatarUrl());				
-				
+						us.getAvatarUrl());
+
 			});
 
 			render.add(node);
@@ -402,6 +402,15 @@ public class MainController implements Initializable {
 		Platform.runLater(() -> vbox.getChildren().add(messageNode));
 	}
 
+	public void onUserLeaveJoin(String groupId, String content) throws MalformedURLException {
+		String key = groupId;
+
+		VBox vbox = chatBoxes.computeIfAbsent(key, k -> new VBox(5));
+		Node messageNode = MessageRender.renderSystemNotice(content);
+
+		Platform.runLater(() -> vbox.getChildren().add(messageNode));
+	}
+
 	public void switchConversation(ChatContext context, String nameGroup_User, String imgGr) {
 		textUserOrGroup.setText(nameGroup_User);
 		Image imageGroup = new Image(imgGr, true);
@@ -415,8 +424,9 @@ public class MainController implements Initializable {
 		this.currentChatContext = context;
 		VBox vbox = chatBoxes.computeIfAbsent(getKeyFromContext(context), k -> new VBox(5));
 
-		// ✅ Dùng VBox thật, không dùng vbox.getChildren()
-		vboxInScroll.getChildren().setAll(vbox);
+		// Dùng VBox thật, không dùng vbox.getChildren()
+		Platform.runLater(() -> vboxInScroll.getChildren().setAll(vbox));
+
 	}
 
 	private String getKeyFromContext(ChatContext context) {
@@ -715,13 +725,31 @@ public class MainController implements Initializable {
 		return activeSelect;
 	}
 
-	@Override
-	public void initialize(URL arg0, ResourceBundle arg1) {
-		// assign ban đầu ở broadcast
+	private void setDefault() {
 		setActiveSelect("all");
 		assignActiveSelect(getActiveSelect());
 		switchConversation(new ChatContext(ConversationType.COMMUNITY), "Nhóm cộng đồng",
 				"https://i.ibb.co/bgHSQX6K/download.png");
+	}
+	
+	private void refreshOnHandlerUserLeaveJoin() {
+		//refresh member in group
+		try {
+			Platform.runLater(()->{
+				vboxInScrollPaneListUser_Group.getChildren().clear();
+			});
+			
+			loadGroupHistory(true);			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void initialize(URL arg0, ResourceBundle arg1) {
+		// assign ban đầu ở broadcast
+		setDefault();
 
 		clear.setVisible(false);
 
@@ -755,6 +783,36 @@ public class MainController implements Initializable {
 				try {
 					if (!chatMessage.getSenderId().equals(user.getIdHex())) {
 						onSendAndReceiveMessage(chatMessage, false);
+					}
+				} catch (MalformedURLException e) {
+					e.printStackTrace();
+					System.out.println("Can't receive message");
+				}
+			});
+
+			socketClient.setOnUserLeaveJoin(info -> {
+				try {
+					if (info != null) {
+						String[] part = info.split("_");
+
+						String userId = part[0];
+						String groupId = part[1];
+
+						Group group = socketClient.groupService.getGroupById(groupId);
+						Boolean isJoin = group.getMembers().contains(userId);
+
+						String contentNotify;
+						String username = redisUserService.getCachedUsername(userId);
+
+						if (isJoin) {
+							contentNotify = username + " đã vào nhóm";
+						} else {
+							contentNotify = username + " đã rời nhóm";
+						}
+
+						onUserLeaveJoin(groupId, contentNotify);
+												
+						refreshOnHandlerUserLeaveJoin();
 					}
 				} catch (MalformedURLException e) {
 					e.printStackTrace();
@@ -839,6 +897,20 @@ public class MainController implements Initializable {
 			}
 
 			Platform.runLater(() -> vboxInScroll.getChildren().addAll(rendered));
+		}
+	}
+
+	public void removeGroupConversation(String groupId) {
+		VBox removed = chatBoxes.remove(groupId);
+		if (removed != null) {
+			Platform.runLater(() -> {
+				if (vboxInScroll.getChildren().contains(removed)) {
+					vboxInScroll.getChildren().clear(); // hoặc thay bằng placeholder
+				}
+
+				setDefault();
+			});
+			System.out.println("[DEBUG] Đã xóa VBox của nhóm: " + groupId);
 		}
 	}
 
@@ -948,7 +1020,7 @@ public class MainController implements Initializable {
 															Platform.runLater(() -> commonController.alertInfo(
 																	AlertType.INFORMATION, "Successful!",
 																	"Rời nhóm thành công!"));
-															
+
 															Platform.runLater(() -> {
 																FadeTransition fade = new FadeTransition(
 																		Duration.millis(300), node);
@@ -964,6 +1036,9 @@ public class MainController implements Initializable {
 															try {
 																socketClient.MuteGroup(InetAddress.getByName(
 																		currentGroup.getMulticastIP()), true);
+
+																removeGroupConversation(currentGroup.getIdHex());
+
 															} catch (UnknownHostException e1) {
 																// TODO Auto-generated catch block
 																e1.printStackTrace();
@@ -990,7 +1065,7 @@ public class MainController implements Initializable {
 
 					});
 
-					menu.getItems().addAll(muteItem, leaveItem);
+					menu.getItems().addAll(leaveItem);
 
 					node.setOnMouseEntered(e -> {
 						if (!menu.isShowing()) {
@@ -1126,7 +1201,7 @@ public class MainController implements Initializable {
 		}
 
 		if (usersSendOrReceiveMessage != null && !usersSendOrReceiveMessage.isEmpty()) {
-			List<Node> renderList=new ArrayList<Node>();
+			List<Node> renderList = new ArrayList<Node>();
 			for (User us : usersSendOrReceiveMessage) {
 				FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/clientNodeClientSide.fxml"));
 
@@ -1137,20 +1212,19 @@ public class MainController implements Initializable {
 				nodeClientRenderClientSide.setUp(null, us,
 						socketClient.redisMessageService.getLatestMessage(us.getIdHex()));
 
-				
 				nodeClientRenderClientSide.setOnClickPrivate(userSelect -> {
 					if (userSelect != null) {
 						reset();
-						
-						switchConversation(new ChatContext(ConversationType.PRIVATE, userSelect.getIdHex()), userSelect.getUsername(),
-								userSelect.getAvatarUrl());
-						
+
+						switchConversation(new ChatContext(ConversationType.PRIVATE, userSelect.getIdHex()),
+								userSelect.getUsername(), userSelect.getAvatarUrl());
+
 					}
 				});
 
 				renderList.add(node);
 			}
-			
+
 			Platform.runLater(() -> vboxInScrollPaneListUser_Group.getChildren().addAll(renderList));
 		}
 

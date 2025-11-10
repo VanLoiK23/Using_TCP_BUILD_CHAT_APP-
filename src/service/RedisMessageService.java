@@ -28,7 +28,7 @@ public class RedisMessageService {
 	}
 
 	public void subscribeToChannel(String channel, JedisPubSub listener) {
-		new Thread(() -> jedisPooled.subscribe(listener, channel)).start();
+		jedisPooled.subscribe(listener, channel);
 	}
 
 }

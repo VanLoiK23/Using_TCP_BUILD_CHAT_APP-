@@ -24,7 +24,7 @@ public class GroupHandler {
 		return ip;
 	}
 
-	public void updateGroup( Group group, GroupService groupService) throws IOException {
+	public void updateGroup(Group group, GroupService groupService) throws IOException {
 
 		groupService.updateGroup(group);
 
