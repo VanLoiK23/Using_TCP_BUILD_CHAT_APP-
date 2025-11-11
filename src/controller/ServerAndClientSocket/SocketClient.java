@@ -48,7 +48,7 @@ public class SocketClient {
 	private DataInputStream in;
 	public Gson gson = Converters.registerAll(new GsonBuilder()).setDateFormat("EEE MMM dd HH:mm:ss z yyyy").create();
 //	private OutputStream outputStream;
-	private static final String SERVER = "192.168.1.52";// IP server
+	private static final String SERVER = "192.168.1.62";// IP server
 	private static final int PORT = 12345;
 	private static final int PORT_GROUP = 5000;
 	private Consumer<ChatMessage> messageHandler;
@@ -332,6 +332,10 @@ public class SocketClient {
 						instance.responseJoinGRQueue.offer(packet);
 					} else if (packet.getType().equals("LEAVE_RESULT")) {
 						instance.responseLeftGRQueue.offer(packet);
+					} else if (packet.getType().equals("USER_JoinOrLeave")) {
+						if (onUserLeaveJoinGroup != null) {
+							onUserLeaveJoinGroup.accept((String) packet.getData());
+						}
 					} else {
 						instance.responseQueue.offer(packet);
 					}

@@ -99,12 +99,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import com.fatboyindustrial.gsonjavatime.Converters;
@@ -145,7 +145,7 @@ public class SocketServer implements Runnable {
 	private GroupService groupService;
 	private String userID;
 	private String clientIP;
-	private Map<String, Group> groupHashMap = new HashMap<String, Group>();
+    private static final Map<String, Group> groupHashMap = new ConcurrentHashMap<>();
 
 	// Danh sách tất cả client đang kết nối (dùng Vector để quản lý)
 	private static Vector<SocketServer> clients = new Vector<>();
@@ -289,14 +289,16 @@ public class SocketServer implements Runnable {
 					break;
 				}
 				case "CREATE_GROUP": {
-					updateHashMap();
-
 					Group group = gson.fromJson(gson.toJson(packet.getData()), Group.class);
 
 					GroupHandler groupHandler = new GroupHandler();
 					String newKeyGroup = groupHandler.createGroup(group, getListKeyGroup(), groupService);
 
-					groupHashMap.put(newKeyGroup, group);
+					// ????
+					group.setMulticastIP(newKeyGroup);
+
+					// Thêm vào hash map
+					groupHashMap.put(newKeyGroup.trim(), group);
 
 					Packet packetResponse = new Packet();
 					packetResponse.setType("CREATE_RESULT");
@@ -312,6 +314,8 @@ public class SocketServer implements Runnable {
 					Group group = gson.fromJson(gson.toJson(packet.getData()), Group.class);
 
 					Group groupAdjusted = updateListMember(group, true);
+					
+					groupAdjusted.set_id(group.get_id());
 
 					GroupHandler groupHandler = new GroupHandler();
 					groupHandler.updateGroup(groupAdjusted, groupService);
@@ -342,6 +346,8 @@ public class SocketServer implements Runnable {
 					Group group = gson.fromJson(gson.toJson(packet.getData()), Group.class);
 
 					Group groupAdjusted = updateListMember(group, false);
+					
+					groupAdjusted.set_id(group.get_id());
 
 					setLogging("Yêu cầu: LEAVE GROUP từ " + socket.getInetAddress() + ":" + socket.getPort(), "INFO");
 
@@ -551,7 +557,7 @@ public class SocketServer implements Runnable {
 	}
 
 	private Group updateListMember(Group group, Boolean isJoin) {
-		Group targetGroup = groupHashMap.get(group.getMulticastIP());
+		Group targetGroup = groupHashMap.get(group.getMulticastIP().trim());
 		if (targetGroup != null) {
 			List<String> members = targetGroup.getMembers();
 			if (members == null) {
@@ -580,8 +586,9 @@ public class SocketServer implements Runnable {
 		List<Group> allGroups = groupService.getAllGroups();
 		if (allGroups != null && !allGroups.isEmpty())
 			for (Group gr : allGroups)
-				groupHashMap.put(gr.getMulticastIP(), gr);
+				groupHashMap.put(gr.getMulticastIP().trim(), gr);
 	}
+	
 
 	private static boolean isUserOnline(String userID) {
 		return getClients().stream().anyMatch(c -> userID.equals(c.getUserID()));
