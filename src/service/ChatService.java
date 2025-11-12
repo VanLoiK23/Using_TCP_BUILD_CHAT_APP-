@@ -44,7 +44,10 @@ public class ChatService {
 		redisUserService = new RedisUserService(jedisPooled);
 	}
 
-	public Boolean saveMessage(ChatMessage msg) {
+	public Boolean saveMessage(ChatMessage saveChatMessage) {
+		
+		ChatMessage msg=new ChatMessage(saveChatMessage);
+		
 		InsertOneResult result = messageCollection.insertOne(msg.toDocument());
 
 		if (msg.getType().equals("file")) {

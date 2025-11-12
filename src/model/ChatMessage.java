@@ -41,6 +41,21 @@ public class ChatMessage {
                 .append("timestamp", timestamp.toString())
                 .append("is_read", isRead);
     }
+    
+    public ChatMessage(ChatMessage other) {
+        this.senderId = other.senderId;
+        this.receiverId = other.receiverId;
+        this.groupId = other.groupId;
+        this.type = other.type;
+        this.chatType = other.chatType;
+        this.timestamp = other.timestamp;
+        this.isRead = other.isRead;
+        this.content = other.content;
+    }
+
+    public ChatMessage() {
+    	
+    }
 
     static class Id {
         @SerializedName("$oid")

@@ -391,7 +391,7 @@ public class MainController implements Initializable {
 			key = "community";
 		} else if (chatMessage.getChatType().equals("group")) {
 			key = chatMessage.getGroupId();
-		} else {
+		} else { // private
 			key = chatMessage.getReceiverId().equals(user.getIdHex()) ? chatMessage.getSenderId()
 					: chatMessage.getReceiverId();
 		}
@@ -437,158 +437,72 @@ public class MainController implements Initializable {
 		return context.getTargetId();
 	}
 
-	// tách ra MessageRender
-//	public void onSendAndReceiveMessenge(ChatMessage chatMessage, Boolean isSend) throws MalformedURLException {
+	public void renderFileMessage(ChatMessage chatMessage, boolean isSend) throws IOException {
+
+		String key;
+		if (chatMessage.getChatType().equals("community")) {
+			key = "community";
+		} else if (chatMessage.getChatType().equals("group")) {
+			key = chatMessage.getGroupId();
+		} else { // private
+			key = chatMessage.getReceiverId().equals(user.getIdHex()) ? chatMessage.getSenderId()
+					: chatMessage.getReceiverId();
+		}
+
+		VBox vbox = chatBoxes.computeIfAbsent(key, k -> new VBox(5));
+
+		Node fileNode = MessageRender.renderFileMessage(chatMessage, isSend, lastSenderId, redisUserService,
+				socketClient);
+
+		Platform.runLater(() -> vbox.getChildren().add(fileNode));
+
 //
-//		String messageContent = chatMessage.getContent();
+//		FXMLLoader loader = new FXMLLoader(getClass()
+//				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
+//		Node fileBubble = loader.load();
 //
 //		Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
-//		mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT, "-fx-text-fill: rgb(239,242,255);"
-//				+ "-fx-background-color: rgb(15,125,242);" + "-fx-background-radius: 20px;"));
+//		mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT,
+//				"-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"));
 //		mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT,
-//				"-fx-text-fill: black;" + "-fx-background-color: rgb(233,233,235);" + "-fx-background-radius: 20px;"));
+//				"-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
 //
-//		// fetch from cache tang toc do
-//		User userSender = new User();
-//		if (chatMessage.getSenderId().equals("Server")) {
-//			userSender.setUsername("Tin nhắn hệ thống");
-//			userSender.setAvatarUrl("https://i.ibb.co/yBhhZRdB/images.jpg");
+//		FileRenderMessage controller = loader.getController();
+//		// truyền dữ liệu vào controller
+//		if (isImage) {
+//			controller.setImageInfo(fileData);
 //		} else {
-//			userSender.setUsername(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-//			userSender.setAvatarUrl(redisUserService.getCachedAvatar(chatMessage.getSenderId()));
+//			controller.setFileInfo(fileData);
 //		}
 //
-//		// Avatar hình tròn
+////	    Platform.runLater(() -> vboxInScroll.getChildren().add(fileBubble));
 //
-//		Image image = new Image(userSender.getAvatarUrl(), true);
-//
-//		ImageView avatar = new ImageView();
-//		avatar.setFitWidth(30);
-//		avatar.setFitHeight(30);
-//		avatar.setClip(new Circle(15, 15, 15));
-//
-//		image.progressProperty().addListener((obs, oldVal, newVal) -> {
-//			if (newVal.doubleValue() == 1.0 && !image.isError()) {
-//				avatar.setImage(image);
-//			}
-//		});
-//
-//		// Bong bóng tin nhắn
-//		Text text = new Text(messageContent);
-//
-//		// dinh dang kieu tin nhan
-//		if (isSend) {
-//			text.setFill(Color.color(0.934, 0.945, 0.996));
-//		}
-//		TextFlow textFlow = new TextFlow(text);
-//		textFlow.setStyle(mapStyleMessenger.get(isSend).styleCss);
-//		textFlow.setPadding(new Insets(5, 10, 5, 10));
-//		textFlow.setMaxWidth(300);
-//
-//		// HBox chứa avatar + tin nhắn
 //		HBox hBox = new HBox(10);
 //		hBox.setAlignment(mapStyleMessenger.get(isSend).position);
 //		hBox.setPadding(new Insets(5, 5, 5, 10));
-//		hBox.setStyle("-fx-cursor: text;");
 //
-//		if (isSend) {
-//			hBox.getChildren().addAll(textFlow);
+//		if (!isSend) {
+//			ImageView avatar = new ImageView(
+//					new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
+//			avatar.setFitWidth(30);
+//			avatar.setFitHeight(30);
+//			avatar.setClip(new Circle(15, 15, 15));
+//			hBox.getChildren().addAll(avatar, fileBubble);
 //		} else {
-//			hBox.getChildren().addAll(avatar, textFlow); // avatar bên trái
+//			hBox.getChildren().add(fileBubble);
 //		}
 //
-//		// VBox chứa tên + HBox
 //		VBox messageBox = new VBox(2);
-//
-//		if (isSend) {
-//			messageBox.getChildren().addAll(hBox);
-//
-////			messageBox.setOnMouseClicked(event -> {
-////			    messageBox.setStyle("-fx-translate-y:10px;-fx-text-fill:orange");
-////			    messageBox.
-////			});
-//			vboxInScroll.getChildren().add(messageBox);
+//		if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
+//			Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
+//			nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
+//			messageBox.getChildren().addAll(nameLabel, hBox);
 //		} else {
-//			// Tên người gửi
-//			// nếu trùng người gửi thì ko hiển thị tên và avatar
-//			System.out.println("lastSender: " + lastSenderId);
-//			System.out.println("SenderID message: " + chatMessage.getSenderId());
-//			if (!chatMessage.getSenderId().equals(lastSenderId)) {
-//				Label nameLabel = new Label(userSender.getUsername());
-//				nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-//				messageBox.getChildren().addAll(nameLabel, hBox);
-//			} else {
-//				hBox.setStyle("-fx-translate-x:40px");
-//				hBox.setSpacing(1.0);
-//				hBox.getChildren().remove(avatar); // ẩn avatar
-//				messageBox.getChildren().add(hBox); // không có tên
-//			}
-//
-////			Label nameLabel = new Label(userSender.getUsername());
-////			nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-////
-////			messageBox.getChildren().addAll(nameLabel, hBox);
-//
-//			Platform.runLater(() -> vboxInScroll.getChildren().add(messageBox));
+//			messageBox.getChildren().add(hBox);
 //		}
 //
+//		Platform.runLater(() -> vboxInScroll.getChildren().add(messageBox));
 //		lastSenderId = chatMessage.getSenderId();
-//	}
-
-	public void renderFileMessage(ChatMessage chatMessage, boolean isSend) throws IOException {
-		FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);
-
-		String fileName = fileData.getUrlUpload();
-		String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
-		boolean isImage = extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png");
-
-		FXMLLoader loader = new FXMLLoader(getClass()
-				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
-		Node fileBubble = loader.load();
-
-		Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
-		mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT,
-				"-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"));
-		mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT,
-				"-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
-
-		FileRenderMessage controller = loader.getController();
-		// truyền dữ liệu vào controller
-		if (isImage) {
-			controller.setImageInfo(fileData);
-		} else {
-			controller.setFileInfo(fileData);
-		}
-
-//	    Platform.runLater(() -> vboxInScroll.getChildren().add(fileBubble));
-
-		HBox hBox = new HBox(10);
-		hBox.setAlignment(mapStyleMessenger.get(isSend).position);
-		hBox.setPadding(new Insets(5, 5, 5, 10));
-
-		if (!isSend) {
-			ImageView avatar = new ImageView(
-					new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
-			avatar.setFitWidth(30);
-			avatar.setFitHeight(30);
-			avatar.setClip(new Circle(15, 15, 15));
-			hBox.getChildren().addAll(avatar, fileBubble);
-		} else {
-			hBox.getChildren().add(fileBubble);
-		}
-
-		VBox messageBox = new VBox(2);
-		if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
-			Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-			nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-			messageBox.getChildren().addAll(nameLabel, hBox);
-		} else {
-			messageBox.getChildren().add(hBox);
-		}
-
-		Platform.runLater(() -> vboxInScroll.getChildren().add(messageBox));
-		lastSenderId = chatMessage.getSenderId();
-
 	}
 
 	private void reset() {
@@ -620,25 +534,16 @@ public class MainController implements Initializable {
 	}
 
 	public void renderLocalFileMessage(File file, Boolean isImage) throws IOException {
-		FXMLLoader loader = new FXMLLoader(getClass()
-				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
-
-		Node fileBubble = loader.load();
-
-		FileRenderMessage controller = loader.getController();
-		// truyền dữ liệu vào controller
-		if (isImage) {
-			controller.setImagesLocal(file);
-		} else {
-			controller.setFileInfoLocal(file);
+		String key = currentChatContext.getTargetId();
+		if (currentChatContext.getType().equals(ConversationType.COMMUNITY)) {
+			key = "community";
 		}
 
-		HBox hBox = new HBox(fileBubble);
-		hBox.setAlignment(Pos.CENTER_RIGHT);
-		hBox.setPadding(new Insets(5, 5, 5, 10));
+		VBox vbox = chatBoxes.computeIfAbsent(key, k -> new VBox(5));
 
-		VBox messageBox = new VBox(hBox);
-		vboxInScroll.getChildren().add(messageBox);
+		Node fileBoxNode = MessageRender.renderFileLocal(file, isImage);
+
+		Platform.runLater(() -> vbox.getChildren().add(fileBoxNode));
 	}
 
 	@FXML
@@ -683,10 +588,29 @@ public class MainController implements Initializable {
 
 			System.out.println(word + " hợp lệ: " + selectedFile.getAbsolutePath());
 
-			if (socketClient.checkRunningServer()) {
-				socketClient.sendFile(selectedFile, user.getIdHex(), "all");
+			Boolean isSendFile = false;
 
-				renderLocalFileMessage(selectedFile, isImage);
+			if (socketClient.checkRunningServer()) {
+				if (currentChatContext.getType().equals(ConversationType.PRIVATE)) {
+					if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
+						socketClient.sendFile(selectedFile, user.getIdHex(), "private",
+								currentChatContext.getTargetId());
+
+						isSendFile = true;
+					}
+				} else if (currentChatContext.getType().equals(ConversationType.GROUP)) {
+					if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
+						socketClient.sendFile(selectedFile, user.getIdHex(), "group", currentChatContext.getTargetId());
+						isSendFile = true;
+					}
+				} else {
+					socketClient.sendFile(selectedFile, user.getIdHex(), "community", null);
+					isSendFile = true;
+				}
+
+				if (isSendFile) {
+					renderLocalFileMessage(selectedFile, isImage);
+				}
 			} else {
 				commonController.alertInfo(AlertType.WARNING, "Establieshed to server is fail", "Can't send " + word);
 				socketClient.reConnectToServer();
@@ -731,15 +655,15 @@ public class MainController implements Initializable {
 		switchConversation(new ChatContext(ConversationType.COMMUNITY), "Nhóm cộng đồng",
 				"https://i.ibb.co/bgHSQX6K/download.png");
 	}
-	
+
 	private void refreshOnHandlerUserLeaveJoin() {
-		//refresh member in group
+		// refresh member in group
 		try {
-			Platform.runLater(()->{
+			Platform.runLater(() -> {
 				vboxInScrollPaneListUser_Group.getChildren().clear();
 			});
-			
-			loadGroupHistory(true);			
+
+			loadGroupHistory(true);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -811,7 +735,7 @@ public class MainController implements Initializable {
 						}
 
 						onUserLeaveJoin(groupId, contentNotify);
-												
+
 						refreshOnHandlerUserLeaveJoin();
 					}
 				} catch (MalformedURLException e) {
@@ -822,6 +746,8 @@ public class MainController implements Initializable {
 
 			socketClient.setFileMessageHandler(chatMessage -> {
 				try {
+					System.out.println("File meta: "+chatMessage);
+					
 					renderFileMessage(chatMessage, false);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block

@@ -48,7 +48,7 @@ public class SocketClient {
 	private DataInputStream in;
 	public Gson gson = Converters.registerAll(new GsonBuilder()).setDateFormat("EEE MMM dd HH:mm:ss z yyyy").create();
 //	private OutputStream outputStream;
-	private static final String SERVER = "192.168.1.62";// IP server
+	private static final String SERVER = "192.168.1.70";// IP server
 	private static final int PORT = 12345;
 	private static final int PORT_GROUP = 5000;
 	private Consumer<ChatMessage> messageHandler;
@@ -430,7 +430,6 @@ public class SocketClient {
 					}
 				}
 			};
-
 			subscribeToChannel("group-chat", listener);
 		}
 	}
@@ -553,7 +552,7 @@ public class SocketClient {
 	private static final int BUFFER_SIZE = 4096;
 
 	// Gửi file từ client edit lai
-	public void sendFile(File file, String senderId, String receiverId) {
+	public void sendFile(File file, String senderId, String converStationType, String receiverId) {
 		if (checkRunningServer()) {
 			new Thread(() -> {
 				try {
@@ -561,8 +560,13 @@ public class SocketClient {
 
 					ChatMessage chatMessage = new ChatMessage();
 					chatMessage.setSenderId(senderId);
-					chatMessage.setReceiverId(receiverId);
+					if (converStationType.equalsIgnoreCase("group")) {
+						chatMessage.setGroupId(receiverId);
+					} else if (converStationType.equalsIgnoreCase("private")) {
+						chatMessage.setReceiverId(receiverId);
+					}
 					chatMessage.setType("file");
+					chatMessage.setChatType(converStationType);
 					chatMessage.setRead(false);
 					chatMessage.setTimestamp(LocalDateTime.now());
 

@@ -63,9 +63,12 @@ public class FileHandler {
 					packet.setType("FILE_UPLOAD_RESULT");
 					System.out.println(uploadURL);
 
+					//file name and url download file from clound
 					FileInfo fileInfoReponse = new FileInfo(fileName, 0, uploadURL);
 					chatMessage.setContent(gson.toJson(fileInfoReponse));
 					
+					
+					//tham chiếu đến chatMessage ban đầu đổi content theo cùng trỏ đến cùng một đối tượng ChatMessage trong heap.
 					chatService.saveMessage(chatMessage);
 					packet.setData(chatMessage);
 
