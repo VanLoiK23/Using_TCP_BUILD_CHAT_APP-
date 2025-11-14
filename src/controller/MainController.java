@@ -9,7 +9,6 @@ import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
@@ -18,7 +17,7 @@ import java.util.stream.Collectors;
 
 import controller.Common.CommonController;
 import controller.ServerAndClientSocket.SocketClient;
-import controller.render.FileRenderMessage;
+import controller.render.EmojiPickerController;
 import controller.render.InfoGroup;
 import controller.render.ListGroupToJoin;
 import controller.render.ListUserController;
@@ -34,24 +33,22 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
-import javafx.geometry.Insets;
+import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.ImagePattern;
@@ -59,13 +56,13 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import model.ChatContext;
 import model.ChatMessage;
 import model.ConversationType;
-import model.FileInfo;
 import model.Group;
 import model.Packet;
 import model.User;
@@ -145,9 +142,12 @@ public class MainController implements Initializable {
 
 	@FXML
 	private VBox vboxInScroll;
-
+	@FXML
+	private Button buttonIcon;
+	
 	private Map<String, VBox> chatBoxes = new HashMap<>(); // key = groupId/userId/community
 	private ChatContext currentChatContext;
+	private Popup emojiPopup;
 
 	public void setUser(User user) {
 		this.user = user;
@@ -187,6 +187,56 @@ public class MainController implements Initializable {
 
 	}
 
+	@FXML
+	void onIconClick(MouseEvent event) throws IOException {
+	    System.out.println("ok");
+ 
+	    if (buttonIcon != null) { // Bây giờ điều kiện này sẽ đúng
+	        if (emojiPopup.isShowing()) {
+	            emojiPopup.hide();
+	        } else {
+	            Bounds bounds = buttonIcon.localToScreen(buttonIcon.getBoundsInLocal());
+	            emojiPopup.show(buttonIcon, bounds.getMinX() - 76, bounds.getMinY() - 330);
+	        }
+	    } else {
+	        System.err.println("Lỗi: Không tìm thấy buttonIcon!");
+	    }
+	}
+	 private void setupEmojiPopup() {
+		 System.out.println("OK");
+	        try {
+	        	String cssPath = "/style/emoji.css";
+	            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/Chat/Imoji.fxml"));
+	            VBox emojiPickerRoot = loader.load(); // Tải layout (VBox)
+
+	            // 2. Lấy controller của FXML đó
+	             EmojiPickerController emojiController = loader.getController();
+	             // Tải CSS để ép buộc hiển thị emoji màu (chỉ khi tìm thấy)
+	             URL cssUrl = getClass().getResource(cssPath);
+	             if (cssUrl != null) {
+	                 emojiPickerRoot.getStylesheets().add(cssUrl.toExternalForm());
+	             } else {
+	                 System.err.println("CẢNH BÁO: Không tìm thấy CSS tại đường dẫn: " + cssPath + ". Emoji có thể bị đen trắng.");
+	             }
+	            // 3. Thiết lập "cầu nối" (Callback)
+	            // Khi người dùng chọn emoji bên FXML kia...
+	            emojiController.setOnEmojiSelected(unicode -> {
+	                // ...chúng ta chèn nó vào textnhap và ẩn popup
+	            	messageText.appendText(unicode);
+//	                emojiPopup.hide();
+	            });
+
+	            // 4. Tạo Popup và thêm FXML đã tải vào
+	            emojiPopup = new Popup();
+	            emojiPopup.getContent().add(emojiPickerRoot);
+	            emojiPopup.setAutoHide(true); // Tự ẩn khi nhấp ra ngoài
+
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            System.err.println("LỖI: Không thể tải /view/Imoji.fxml. " +
+	                               "Hãy kiểm tra lại đường dẫn file FXML.");
+	        }
+	    }
 	@FXML
 	void clickChat(MouseEvent event) throws IOException {
 //		reset();
@@ -672,6 +722,8 @@ public class MainController implements Initializable {
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
+		//set khoi tao emoji
+        setupEmojiPopup();
 		// assign ban đầu ở broadcast
 		setDefault();
 
@@ -746,8 +798,8 @@ public class MainController implements Initializable {
 
 			socketClient.setFileMessageHandler(chatMessage -> {
 				try {
-					System.out.println("File meta: "+chatMessage);
-					
+					System.out.println("File meta: " + chatMessage);
+
 					renderFileMessage(chatMessage, false);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -1155,4 +1207,5 @@ public class MainController implements Initializable {
 		}
 
 	}
+
 }

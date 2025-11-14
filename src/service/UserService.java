@@ -5,6 +5,7 @@ import static com.mongodb.client.model.Filters.eq;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -25,17 +26,24 @@ import com.mongodb.client.result.InsertOneResult;
 import model.User;
 import util.CloudinaryUtil;
 import util.MongoUtil;
+import util.MultiDateDeserializer;
 import util.PasswordUtil;
 import util.RedisUtil;
 
 public class UserService {
 	private final MongoCollection<Document> userCollection;
-	private final Gson gson = 
-//			Converters.registerAll(new GsonBuilder()).create();
-//			 new GsonBuilder()
-			Converters.registerAll(new GsonBuilder())
-		    .setDateFormat("EEE MMM dd HH:mm:ss z yyyy")
-		    .create();
+//	private final Gson gson = 
+////			Converters.registerAll(new GsonBuilder()).create();
+////			 new GsonBuilder()
+//			Converters.registerAll(new GsonBuilder())
+//		    .setDateFormat("EEE MMM dd HH:mm:ss z yyyy")
+//		    .create();
+	
+	private final Gson gson =
+	        Converters.registerAll(new GsonBuilder())
+	                .registerTypeAdapter(Date.class, new MultiDateDeserializer())
+	                .create();
+
 	private RedisUserService redisUserService;
 	private RedisOnlineService redisOnlineService;
 

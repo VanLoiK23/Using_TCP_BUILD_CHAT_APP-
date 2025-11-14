@@ -6,6 +6,8 @@ import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.vdurmont.emoji.EmojiManager;
+
 import controller.ServerAndClientSocket.SocketClient;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -37,75 +39,123 @@ public class MessageRender {
 		}
 	}
 
-	public static Node renderTextMessage(ChatMessage chatMessage, boolean isSend, String lastSenderId,
-			RedisUserService redisUserService) throws MalformedURLException {
-		String messageContent = chatMessage.getContent();
+public static Node renderTextMessage(ChatMessage chatMessage, boolean isSend, String lastSenderId,
+        RedisUserService redisUserService) throws MalformedURLException {
+    String messageContent = chatMessage.getContent();
 
-		Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
-		mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT, "-fx-text-fill: rgb(239,242,255);"
-				+ "-fx-background-color: rgb(15,125,242);" + "-fx-background-radius: 20px;"));
-		mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT,
-				"-fx-text-fill: black;" + "-fx-background-color: rgb(233,233,235);" + "-fx-background-radius: 20px;"));
+    Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
+    // Bỏ -fx-text-fill vì ta sẽ set màu bằng code
+    mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT,
+            "-fx-background-color: rgb(15,125,242);" + "-fx-background-radius: 20px;"));
+    mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT,
+            "-fx-background-color: rgb(233,233,235);" + "-fx-background-radius: 20px;"));
 
-		User userSender = new User();
-		if (chatMessage.getSenderId().equals("Server")) {
-			userSender.setUsername("Tin nhắn hệ thống");
-			userSender.setAvatarUrl("https://i.ibb.co/yBhhZRdB/images.jpg");
-		} else {
-			userSender.setUsername(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-			userSender.setAvatarUrl(redisUserService.getCachedAvatar(chatMessage.getSenderId()));
-		}
+    User userSender = new User();
+    if (chatMessage.getSenderId().equals("Server")) {
+        userSender.setUsername("Tin nhắn hệ thống");
+        userSender.setAvatarUrl("https://i.ibb.co/yBhhZRdB/images.jpg");
+    } else {
+        userSender.setUsername(redisUserService.getCachedUsername(chatMessage.getSenderId()));
+        userSender.setAvatarUrl(redisUserService.getCachedAvatar(chatMessage.getSenderId()));
+    }
 
-		Image image = new Image(userSender.getAvatarUrl(), true);
-		ImageView avatar = new ImageView();
-		avatar.setFitWidth(30);
-		avatar.setFitHeight(30);
-		avatar.setClip(new Circle(15, 15, 15));
-		image.progressProperty().addListener((obs, oldVal, newVal) -> {
-			if (newVal.doubleValue() == 1.0 && !image.isError()) {
-				avatar.setImage(image);
-			}
-		});
+    Image image = new Image(userSender.getAvatarUrl(), true);
+    ImageView avatar = new ImageView();
+    avatar.setFitWidth(30);
+    avatar.setFitHeight(30);
+    avatar.setClip(new Circle(15, 15, 15));
+    image.progressProperty().addListener((obs, oldVal, newVal) -> {
+        if (newVal.doubleValue() == 1.0 && !image.isError()) {
+            avatar.setImage(image);
+        }
+    });
 
-		Text text = new Text(messageContent);
-		if (isSend)
-			text.setFill(Color.color(0.934, 0.945, 0.996));
+    TextFlow textFlow = new TextFlow();
+    textFlow.setMaxWidth(300);
 
-		TextFlow textFlow = new TextFlow(text);
-		textFlow.setStyle(mapStyleMessenger.get(isSend).styleCss);
-		textFlow.setPadding(new Insets(5, 10, 5, 10));
-		textFlow.setMaxWidth(300);
+    // --- SỬA LẠI LOGIC MÀU (Quan trọng) ---
+    final Color textColor;
+    if (isSend) {
+        textColor = Color.color(0.934, 0.945, 0.996); // Màu trắng
+    } else {
+        textColor = Color.BLACK; // Màu đen cho tin nhắn nhận
+    }
+    // --- KẾT THÚC SỬA MÀU ---
 
-		HBox hBox = new HBox(10);
-		hBox.setAlignment(mapStyleMessenger.get(isSend).position);
-		hBox.setPadding(new Insets(5, 5, 5, 10));
-		hBox.setStyle("-fx-cursor: text;");
+    for (int i = 0; i < messageContent.length();) {
+        int cp = messageContent.codePointAt(i);
+        String ch = new String(Character.toChars(cp));
 
-		if (isSend) {
-			hBox.getChildren().add(textFlow);
-		} else {
-			hBox.getChildren().addAll(avatar, textFlow);
-		}
+        if (EmojiManager.isEmoji(ch)) {
+            String codepoint = Integer.toHexString(cp);
+            
+            // ĐƯỜNG DẪN CỐ ĐỊNH TỪ MÁY CỦA BẠN
+            // (Đã xử lý dấu \ thành / và thêm file:/)
+            String projectRoot = System.getProperty("user.dir");
+            String normalizedRoot = projectRoot.replace("\\", "/");
+            String basePath = "file:/" + normalizedRoot + "/src/Other/Img/emoji_36/";
+            String absolutePath = basePath + codepoint + ".png";
 
-		VBox messageBox = new VBox(2);
-		if (isSend) {
-			messageBox.getChildren().add(hBox);
-		} else {
-			if (!chatMessage.getSenderId().equals(lastSenderId)) {
-				Label nameLabel = new Label(userSender.getUsername());
-				nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-				messageBox.getChildren().addAll(nameLabel, hBox);
-			} else {
-				hBox.setStyle("-fx-translate-x:40px");
-				hBox.setSpacing(1.0);
-				hBox.getChildren().remove(avatar);
-				messageBox.getChildren().add(hBox);
-			}
-		}
+            Image img = null;
+            try {
+                // Tải ảnh trực tiếp từ đường dẫn cố định
+                img = new Image(absolutePath, true); // true = tải nền
+            } catch (Exception e) {
+                // System.out.println("[ERROR] Lỗi khi tạo Image: " + e.getMessage());
+            }
 
-		return messageBox;
-	}
+            // Kiểm tra xem ảnh có tải được không
+            if (img != null && !img.isError()) {
+                ImageView iv = new ImageView(img);
+                iv.setFitWidth(24);
+                iv.setFitHeight(24);
+                textFlow.getChildren().add(iv);
+            } else {
+                // Fallback nếu không tìm thấy file tại đường dẫn cố định
+                Text emojiText = new Text(ch);
+                emojiText.setFill(textColor);
+                textFlow.getChildren().add(emojiText);
+            }
+        } else {
+            Text normalText = new Text(ch);
+            normalText.setFill(textColor);
+            textFlow.getChildren().add(normalText);
+        }
 
+        i += Character.charCount(cp);
+    }
+    textFlow.setStyle(mapStyleMessenger.get(isSend).styleCss);
+    textFlow.setPadding(new Insets(5, 10, 5, 10));
+
+    HBox hBox = new HBox(10);
+    hBox.setAlignment(mapStyleMessenger.get(isSend).position);
+    hBox.setPadding(new Insets(5, 5, 5, 10));
+    hBox.setStyle("-fx-cursor: text;");
+
+    if (isSend) {
+        hBox.getChildren().add(textFlow);
+    } else {
+        hBox.getChildren().addAll(avatar, textFlow);
+    }
+
+    VBox messageBox = new VBox(2);
+    if (isSend) {
+        messageBox.getChildren().add(hBox);
+    } else {
+        if (!chatMessage.getSenderId().equals(lastSenderId)) {
+            Label nameLabel = new Label(userSender.getUsername());
+            nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
+            messageBox.getChildren().addAll(nameLabel, hBox);
+        } else {
+            hBox.setStyle("-fx-translate-x:40px");
+            hBox.setSpacing(1.0);
+            hBox.getChildren().remove(avatar);
+            messageBox.getChildren().add(hBox);
+        }
+    }
+
+    return messageBox;
+}
 	public static Node renderSystemNotice(String content) {
 		Label noticeLabel = new Label(content);
 		noticeLabel.setStyle("-fx-text-fill: gray;" + "-fx-font-style: italic;" + "-fx-font-size: 13px;"

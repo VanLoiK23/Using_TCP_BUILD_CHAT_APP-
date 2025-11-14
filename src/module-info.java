@@ -25,6 +25,7 @@ module Chat_Messenger {
 	requires fontawesomefx;
 	requires java.desktop;
 	requires com.fasterxml.jackson.annotation;
+	requires emoji.java;
 
 	opens application to javafx.graphics, javafx.fxml;
 	opens model to com.google.gson;
