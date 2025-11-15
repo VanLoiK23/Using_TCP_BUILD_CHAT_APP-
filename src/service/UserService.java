@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.cloudinary.Cloudinary;
@@ -21,7 +22,9 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.result.UpdateResult;
 
 import model.User;
 import util.CloudinaryUtil;
@@ -38,11 +41,9 @@ public class UserService {
 //			Converters.registerAll(new GsonBuilder())
 //		    .setDateFormat("EEE MMM dd HH:mm:ss z yyyy")
 //		    .create();
-	
-	private final Gson gson =
-	        Converters.registerAll(new GsonBuilder())
-	                .registerTypeAdapter(Date.class, new MultiDateDeserializer())
-	                .create();
+
+	private final Gson gson = Converters.registerAll(new GsonBuilder())
+			.registerTypeAdapter(Date.class, new MultiDateDeserializer()).create();
 
 	private RedisUserService redisUserService;
 	private RedisOnlineService redisOnlineService;
@@ -50,10 +51,10 @@ public class UserService {
 	public UserService() {
 		MongoDatabase db = MongoUtil.getDatabase();
 		userCollection = db.getCollection("user");
-		redisUserService=new RedisUserService(RedisUtil.getClient());
-		redisOnlineService=new RedisOnlineService(RedisUtil.getClient());
+		redisUserService = new RedisUserService(RedisUtil.getClient());
+		redisOnlineService = new RedisOnlineService(RedisUtil.getClient());
 	}
-	
+
 	public void setUpLogin(User user) {
 		redisUserService.cacheUserInfo(user.getIdHex(), user.getUsername(), user.getAvatarUrl());
 		redisOnlineService.setUserOnline(user.getIdHex());
@@ -74,28 +75,62 @@ public class UserService {
 	}
 
 	public String upsertImg(File file) throws IOException {
-		
+
 		Cloudinary cloudinary = CloudinaryUtil.getCloudinary();
 
 		Map uploadResult = cloudinary.uploader().upload(file, ObjectUtils.emptyMap());
 		String imageUrl = (String) uploadResult.get("secure_url");
-		
-		System.out.println("img avatar :"+imageUrl);
+
+		System.out.println("img avatar :" + imageUrl);
 
 		return imageUrl;
 	}
 
 	public User getUserById(String userId) {
-	    try {
-	        ObjectId objectId = new ObjectId(userId); // chuyển chuỗi sang ObjectId
-	        Document doc = userCollection.find(eq("_id", objectId)).first();
-	        if (doc != null) {
-	            return gson.fromJson(doc.toJson(), User.class);
-	        }
-	    } catch (IllegalArgumentException e) {
-	        System.out.println("ID không hợp lệ: " + userId);
-	    }
-	    return null;
+		try {
+			ObjectId objectId = new ObjectId(userId); // chuyển chuỗi sang ObjectId
+			Document doc = userCollection.find(eq("_id", objectId)).first();
+			if (doc != null) {
+				return gson.fromJson(doc.toJson(), User.class);
+			}
+		} catch (IllegalArgumentException e) {
+			System.out.println("ID không hợp lệ: " + userId);
+		}
+		return null;
+	}
+
+	public boolean updateUserById(String userId, User newData) {
+		try {
+			ObjectId objectId = new ObjectId(userId);
+
+			List<Bson> updates = new ArrayList<>();
+
+			updates.add(Updates.set("username", newData.getUsername()));
+			updates.add(Updates.set("gender", newData.getGender()));
+			updates.add(Updates.set("bod", newData.getBod().toString()));
+			updates.add(Updates.set("email", newData.getEmail()));
+			updates.add(Updates.set("avatarUrl", newData.getAvatarUrl()));
+
+			if (newData.getPassword() != null && !newData.getPassword().isEmpty()) {
+				updates.add(Updates.set("password", PasswordUtil.hashPassword(newData.getPassword())));
+			}
+
+			// Thực hiện cập nhật
+			Bson update = Updates.combine(updates);
+			UpdateResult result = userCollection.updateOne(eq("_id", objectId), update);
+
+			Boolean isSuccess = result.getModifiedCount() > 0;
+
+			if (isSuccess) {
+				setUpLogin(newData);
+			}
+			
+			return isSuccess;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 
 	public User getUserByUserName(String username) {

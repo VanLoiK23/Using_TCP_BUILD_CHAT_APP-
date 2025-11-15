@@ -1,5 +1,6 @@
 package controller;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -15,21 +16,29 @@ import java.util.ResourceBundle;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.TargetDataLine;
+
 import controller.Common.CommonController;
 import controller.ServerAndClientSocket.SocketClient;
 import controller.render.EmojiPickerController;
 import controller.render.InfoGroup;
+import controller.render.InfoUser;
 import controller.render.ListGroupToJoin;
 import controller.render.ListUserController;
 import controller.render.MessageRender;
 import controller.render.NodeClientRenderClientSide;
 import controller.render.NodeUserInListUser;
 import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
@@ -46,6 +55,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
@@ -144,7 +154,7 @@ public class MainController implements Initializable {
 	private VBox vboxInScroll;
 	@FXML
 	private Button buttonIcon;
-	
+
 	private Map<String, VBox> chatBoxes = new HashMap<>(); // key = groupId/userId/community
 	private ChatContext currentChatContext;
 	private Popup emojiPopup;
@@ -182,61 +192,70 @@ public class MainController implements Initializable {
 		searchTextFiled.setText(null);
 	}
 
+	private ObservableList<Node> previousNode;
+
 	@FXML
 	void closeSearch(MouseEvent event) {
 
+		Platform.runLater(() -> {
+			vboxInScrollPaneListUser_Group.getChildren().clear();
+
+			vboxInScrollPaneListUser_Group.getChildren().setAll(previousNode);
+
+			closeSearch.setVisible(false);
+			
+			searchTextFiled.setText(null);
+		});
 	}
 
 	@FXML
 	void onIconClick(MouseEvent event) throws IOException {
-	    System.out.println("ok");
- 
-	    if (buttonIcon != null) { // Bây giờ điều kiện này sẽ đúng
-	        if (emojiPopup.isShowing()) {
-	            emojiPopup.hide();
-	        } else {
-	            Bounds bounds = buttonIcon.localToScreen(buttonIcon.getBoundsInLocal());
-	            emojiPopup.show(buttonIcon, bounds.getMinX() - 76, bounds.getMinY() - 330);
-	        }
-	    } else {
-	        System.err.println("Lỗi: Không tìm thấy buttonIcon!");
-	    }
+		System.out.println("ok");
+
+		if (buttonIcon != null) { // Bây giờ điều kiện này sẽ đúng
+			if (emojiPopup.isShowing()) {
+				emojiPopup.hide();
+			} else {
+				Bounds bounds = buttonIcon.localToScreen(buttonIcon.getBoundsInLocal());
+				emojiPopup.show(buttonIcon, bounds.getMinX() - 76, bounds.getMinY() - 330);
+			}
+		} else {
+			System.err.println("Lỗi: Không tìm thấy buttonIcon!");
+		}
 	}
-	 private void setupEmojiPopup() {
-		 System.out.println("OK");
-	        try {
-	        	String cssPath = "/style/emoji.css";
-	            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/Chat/Imoji.fxml"));
-	            VBox emojiPickerRoot = loader.load(); // Tải layout (VBox)
 
-	            // 2. Lấy controller của FXML đó
-	             EmojiPickerController emojiController = loader.getController();
-	             // Tải CSS để ép buộc hiển thị emoji màu (chỉ khi tìm thấy)
-	             URL cssUrl = getClass().getResource(cssPath);
-	             if (cssUrl != null) {
-	                 emojiPickerRoot.getStylesheets().add(cssUrl.toExternalForm());
-	             } else {
-	                 System.err.println("CẢNH BÁO: Không tìm thấy CSS tại đường dẫn: " + cssPath + ". Emoji có thể bị đen trắng.");
-	             }
-	            // 3. Thiết lập "cầu nối" (Callback)
-	            // Khi người dùng chọn emoji bên FXML kia...
-	            emojiController.setOnEmojiSelected(unicode -> {
-	                // ...chúng ta chèn nó vào textnhap và ẩn popup
-	            	messageText.appendText(unicode);
-//	                emojiPopup.hide();
-	            });
+	private void setupEmojiPopup() {
+		System.out.println("OK");
+		try {
+			String cssPath = "/style/emoji.css";
+			FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/Chat/Imoji.fxml"));
+			VBox emojiPickerRoot = loader.load(); // Tải layout (VBox)
 
-	            // 4. Tạo Popup và thêm FXML đã tải vào
-	            emojiPopup = new Popup();
-	            emojiPopup.getContent().add(emojiPickerRoot);
-	            emojiPopup.setAutoHide(true); // Tự ẩn khi nhấp ra ngoài
+			EmojiPickerController emojiController = loader.getController();
 
-	        } catch (Exception e) {
-	            e.printStackTrace();
-	            System.err.println("LỖI: Không thể tải /view/Imoji.fxml. " +
-	                               "Hãy kiểm tra lại đường dẫn file FXML.");
-	        }
-	    }
+			// display color
+			URL cssUrl = getClass().getResource(cssPath);
+			if (cssUrl != null) {
+				emojiPickerRoot.getStylesheets().add(cssUrl.toExternalForm());
+			} else {
+				System.err.println(
+						"CẢNH BÁO: Không tìm thấy CSS tại đường dẫn: " + cssPath + ". Emoji có thể bị đen trắng.");
+			}
+
+			emojiController.setOnEmojiSelected(unicode -> {
+				messageText.appendText(unicode);
+			});
+
+			emojiPopup = new Popup();
+			emojiPopup.getContent().add(emojiPickerRoot);
+			emojiPopup.setAutoHide(true);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.err.println("LỖI: Không thể tải /view/Imoji.fxml. " + "Hãy kiểm tra lại đường dẫn file FXML.");
+		}
+	}
+
 	@FXML
 	void clickChat(MouseEvent event) throws IOException {
 //		reset();
@@ -300,6 +319,101 @@ public class MainController implements Initializable {
 	}
 
 	@FXML
+	private ImageView imgVoice;
+
+	private AudioFormat format;
+	private TargetDataLine mic;
+	private boolean isRecording = false;
+	private ByteArrayOutputStream audioData;
+
+	private Image micInitialImage;
+	private Image micRecordingImage;
+
+	private Timeline recordingAnimation;
+
+	@FXML
+	private void startRecording(MouseEvent event) {
+		try {
+			mic = AudioSystem.getTargetDataLine(format);
+			mic.open(format);
+			mic.start();
+
+			isRecording = true;
+
+			recordingAnimation.play();
+
+			new Thread(() -> {
+				audioData = new ByteArrayOutputStream();
+				byte[] buffer = new byte[1024];
+
+				while (isRecording) {
+					try {
+						int bytesRead = mic.read(buffer, 0, buffer.length);
+						audioData.write(buffer, 0, bytesRead);
+					} catch (Exception ex) {
+						System.err.println("Lỗi khi đọc mic: " + ex.getMessage());
+					}
+				}
+			}).start();
+
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
+
+	@FXML
+	private void stopRecording(MouseEvent event) throws IOException, InterruptedException {
+		if (!isRecording)
+			return;
+
+		isRecording = false;
+
+		if (mic != null) {
+			mic.stop();
+			mic.close();
+		}
+
+		recordingAnimation.stop();
+		imgVoice.setImage(micInitialImage);
+
+		byte[] recordedData = audioData.toByteArray();
+
+		System.out.println("Đã ghi xong: " + recordedData.length + " bytes.");
+
+		Boolean isSendVoice = false;
+
+		if (socketClient.checkRunningServer()) {
+			if (recordedData != null && recordedData.length != 0) {
+				if (currentChatContext.getType().equals(ConversationType.PRIVATE)) {
+					if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
+						socketClient.sendVoiceMessage(recordedData, user.getIdHex(), "private",
+								currentChatContext.getTargetId());
+						isSendVoice = true;
+					}
+				} else if (currentChatContext.getType().equals(ConversationType.GROUP)) {
+					if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
+						socketClient.sendVoiceMessage(recordedData, user.getIdHex(), "group",
+								currentChatContext.getTargetId());
+						isSendVoice = true;
+					}
+				} else {
+					socketClient.sendVoiceMessage(recordedData, user.getIdHex(), "community", null);
+					isSendVoice = true;
+				}
+
+				if (isSendVoice) {
+					renderLocalAudioMessage(recordedData);
+				}
+			} else {
+				commonController.alertInfo(AlertType.WARNING, "Failed", "Can't send voice call is empty");
+			}
+		} else {
+			commonController.alertInfo(AlertType.WARNING, "Establieshed to server is fail", "Can't send voice call");
+			socketClient.reConnectToServer();
+		}
+	}
+
+	@FXML
 	void infoClick(MouseEvent event) throws IOException {
 		if (currentChatContext.getType().equals(ConversationType.GROUP)) {
 			if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
@@ -317,7 +431,48 @@ public class MainController implements Initializable {
 				stage.initModality(Modality.APPLICATION_MODAL);
 				stage.show();
 			}
+		} else if (currentChatContext.getType().equals(ConversationType.PRIVATE)) {
+			if (currentChatContext.getTargetId() != null && !currentChatContext.getTargetId().isEmpty()) {
+				FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/InfoUser.fxml"));
+
+				Parent root = loader.load();
+
+				InfoUser infoUser = loader.getController();
+				infoUser.setUpUser(userService.getUserById(currentChatContext.getTargetId()), false);
+
+				Scene scene = new Scene(root);
+				Stage stage = new Stage();
+				stage.setTitle("Xem thông tin user");
+				stage.setScene(scene);
+				stage.initModality(Modality.APPLICATION_MODAL);
+				stage.show();
+			}
 		}
+	}
+
+	@FXML
+	void clickUpdateInfo(MouseEvent event) throws IOException {
+		FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/component/InfoUser.fxml"));
+
+		Parent root = loader.load();
+
+		InfoUser infoUser = loader.getController();
+		infoUser.setUpUser(user, true);
+		infoUser.setCallBack((userCallback) -> {
+
+			if (userCallback != null) {
+				user = userCallback;
+
+				setUser(userCallback);
+			}
+		});
+
+		Scene scene = new Scene(root);
+		Stage stage = new Stage();
+		stage.setTitle("Update thông tin user");
+		stage.setScene(scene);
+		stage.initModality(Modality.APPLICATION_MODAL);
+		stage.show();
 	}
 
 	private List<User> allUsers = new ArrayList<>();
@@ -326,16 +481,25 @@ public class MainController implements Initializable {
 	@FXML
 	void openSearch(MouseEvent event) throws IOException {
 
-		vboxInScrollPaneListUser_Group.getChildren().clear();
-
-//		setActiveSelect("message");
-//		assignActiveSelect(getActiveSelect());
-
 		allUsers = userService.getAllUser();
 
 		allUsers.remove(user);
 
-		renderUserList(allUsers);
+		previousNode = vboxInScrollPaneListUser_Group.getChildren();
+
+		Platform.runLater(() -> {
+
+			try {
+				closeSearch.setVisible(true);
+
+				vboxInScrollPaneListUser_Group.getChildren().clear();
+
+				renderUserList(allUsers);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		});
 	}
 
 	private void performSearch(String keyword) throws IOException {
@@ -372,6 +536,8 @@ public class MainController implements Initializable {
 		}
 
 		Platform.runLater(() -> {
+			vboxInScrollPaneListUser_Group.getChildren().clear();
+
 			vboxInScrollPaneListUser_Group.getChildren().addAll(render);
 		});
 	}
@@ -505,54 +671,6 @@ public class MainController implements Initializable {
 				socketClient);
 
 		Platform.runLater(() -> vbox.getChildren().add(fileNode));
-
-//
-//		FXMLLoader loader = new FXMLLoader(getClass()
-//				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
-//		Node fileBubble = loader.load();
-//
-//		Map<Boolean, styleDifferenceClass> mapStyleMessenger = new HashMap<>();
-//		mapStyleMessenger.put(true, new styleDifferenceClass(Pos.CENTER_RIGHT,
-//				"-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"));
-//		mapStyleMessenger.put(false, new styleDifferenceClass(Pos.CENTER_LEFT,
-//				"-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
-//
-//		FileRenderMessage controller = loader.getController();
-//		// truyền dữ liệu vào controller
-//		if (isImage) {
-//			controller.setImageInfo(fileData);
-//		} else {
-//			controller.setFileInfo(fileData);
-//		}
-//
-////	    Platform.runLater(() -> vboxInScroll.getChildren().add(fileBubble));
-//
-//		HBox hBox = new HBox(10);
-//		hBox.setAlignment(mapStyleMessenger.get(isSend).position);
-//		hBox.setPadding(new Insets(5, 5, 5, 10));
-//
-//		if (!isSend) {
-//			ImageView avatar = new ImageView(
-//					new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
-//			avatar.setFitWidth(30);
-//			avatar.setFitHeight(30);
-//			avatar.setClip(new Circle(15, 15, 15));
-//			hBox.getChildren().addAll(avatar, fileBubble);
-//		} else {
-//			hBox.getChildren().add(fileBubble);
-//		}
-//
-//		VBox messageBox = new VBox(2);
-//		if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
-//			Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-//			nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-//			messageBox.getChildren().addAll(nameLabel, hBox);
-//		} else {
-//			messageBox.getChildren().add(hBox);
-//		}
-//
-//		Platform.runLater(() -> vboxInScroll.getChildren().add(messageBox));
-//		lastSenderId = chatMessage.getSenderId();
 	}
 
 	private void reset() {
@@ -592,6 +710,19 @@ public class MainController implements Initializable {
 		VBox vbox = chatBoxes.computeIfAbsent(key, k -> new VBox(5));
 
 		Node fileBoxNode = MessageRender.renderFileLocal(file, isImage);
+
+		Platform.runLater(() -> vbox.getChildren().add(fileBoxNode));
+	}
+
+	public void renderLocalAudioMessage(byte[] audioData) throws IOException {
+		String key = currentChatContext.getTargetId();
+		if (currentChatContext.getType().equals(ConversationType.COMMUNITY)) {
+			key = "community";
+		}
+
+		VBox vbox = chatBoxes.computeIfAbsent(key, k -> new VBox(5));
+
+		Node fileBoxNode = MessageRender.renderAudioLocal(audioData);
 
 		Platform.runLater(() -> vbox.getChildren().add(fileBoxNode));
 	}
@@ -722,12 +853,26 @@ public class MainController implements Initializable {
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
-		//set khoi tao emoji
-        setupEmojiPopup();
+		setupEmojiPopup();
 		// assign ban đầu ở broadcast
 		setDefault();
 
 		clear.setVisible(false);
+		closeSearch.setVisible(false);
+
+		format = new AudioFormat(44100.0f, 16, 1, true, false);
+
+		try {
+			micInitialImage = new Image(getClass().getResource("/Other/Img/mic.png").toExternalForm());
+			micRecordingImage = new Image(getClass().getResource("/Other/Img/voicenoteActive.png").toExternalForm());
+			imgVoice.setImage(micInitialImage);
+		} catch (Exception e) {
+			System.err.println("Lỗi nạp ảnh: " + e.getMessage());
+		}
+
+		recordingAnimation = new Timeline(new KeyFrame(Duration.ZERO, e -> imgVoice.setImage(micRecordingImage)),
+				new KeyFrame(Duration.millis(300), e -> imgVoice.setImage(micInitialImage)));
+		recordingAnimation.setCycleCount(Timeline.INDEFINITE);
 
 		searchTextFiled.textProperty().addListener((obs, oldText, newText) -> {
 			if (newText == null || newText.isEmpty()) {
@@ -801,6 +946,7 @@ public class MainController implements Initializable {
 					System.out.println("File meta: " + chatMessage);
 
 					renderFileMessage(chatMessage, false);
+
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();

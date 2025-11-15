@@ -1,0 +1,21 @@
+/* Trong file emoji.css */
+
+.textfield-underline {
+    -fx-background-color: transparent;        /* nền trong suốt */
+    -fx-text-fill: black;                     /* màu chữ */
+
+    /* bỏ toàn bộ border mặc định */
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 5 0 5 0;                     /* padding trên/dưới */
+    
+    /* thêm border dưới */
+    -fx-border-color: transparent transparent black transparent;
+    -fx-border-width: 0 0 2 0;                /* độ dày border dưới */
+    -fx-padding: 0 10 0 10;
+}
+
+.textfield-underline:focused {
+    -fx-border-color: transparent transparent #2196f3 transparent; /* Xanh khi focus */
+    -fx-border-width: 0 0 2 0;
+}

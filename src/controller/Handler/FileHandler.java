@@ -68,7 +68,7 @@ public class FileHandler {
 					chatMessage.setContent(gson.toJson(fileInfoReponse));
 					
 					
-					//tham chiếu đến chatMessage ban đầu đổi content theo cùng trỏ đến cùng một đối tượng ChatMessage trong heap.
+					// tham chiếu đến chatMessage ban đầu đổi content theo cùng trỏ đến cùng một đối tượng ChatMessage trong heap.
 					chatService.saveMessage(chatMessage);
 					packet.setData(chatMessage);
 

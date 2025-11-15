@@ -116,6 +116,7 @@ import controller.Handler.GroupHandler;
 import controller.Handler.LoginHandler;
 import controller.Handler.MessageHandler;
 import controller.Handler.RegisterHandler;
+import controller.Handler.UpdateInfoHandler;
 import model.ChatMessage;
 import model.FileInfo;
 import model.Group;
@@ -251,6 +252,29 @@ public class SocketServer implements Runnable {
 						Packet registerReponse = registerHandler.handle(packet);
 						sendSelfClient(registerReponse);
 						setLogging("Phản hồi tới yêu cầu REGISTER từ " + socket.getInetAddress() + ":"
+								+ socket.getPort() + " :" + "SUCCESS", "INFO");
+					}
+					break;
+				}
+				case "UPDATE_INFO": {
+					User userCheck = gson.fromJson(gson.toJson(packet.getData()), User.class);
+					setLogging("Yêu cầu: UPDATE_INFO từ " + socket.getInetAddress() + ":" + socket.getPort(), "INFO");
+
+					User userResult = userService.getUserByUserName(userCheck.getUsername());
+
+					if (userResult != null) {
+						Packet response = new Packet();
+						response.setType("DUPLICATE_UserName");
+						response.setData(null);
+
+						sendSelfClient(response);
+						setLogging("Phản hồi tới yêu cầu UPDATE_INFO từ " + socket.getInetAddress() + ":"
+								+ socket.getPort() + " :" + response.getType(), "WARNING");
+					} else {
+						UpdateInfoHandler updateInfoHandler = new UpdateInfoHandler(userService, gson);
+						Packet updateResponse = updateInfoHandler.handle(packet);
+						sendSelfClient(updateResponse);
+						setLogging("Phản hồi tới yêu cầu UPDATE_INFO từ " + socket.getInetAddress() + ":"
 								+ socket.getPort() + " :" + "SUCCESS", "INFO");
 					}
 					break;

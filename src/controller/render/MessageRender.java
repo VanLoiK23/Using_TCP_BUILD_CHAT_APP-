@@ -169,57 +169,81 @@ public static Node renderTextMessage(ChatMessage chatMessage, boolean isSend, St
 	}
 
 	public static Node renderFileMessage(ChatMessage chatMessage, boolean isSend, String lastSenderId,
-			RedisUserService redisUserService, SocketClient socketClient) throws IOException {
-		System.out.println("Content chat: "+chatMessage.getContent());
-		
-		FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);
+	        RedisUserService redisUserService, SocketClient socketClient) throws IOException {
+	    System.out.println("Content chat: " + chatMessage.getContent());
 
-		String fileName = fileData.getUrlUpload();
-		String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
-		boolean isImage = extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png");
+	    FileInfo fileData = socketClient.gson.fromJson(chatMessage.getContent(), FileInfo.class);
 
-		FXMLLoader loader = new FXMLLoader(MessageRender.class
-				.getResource((isImage) ? "/view/component/ShowImages.fxml" : "/view/component/FileBubble.fxml"));
-		Node fileBubble = loader.load();
+	    String fileUrl = fileData.getUrlUpload(); 
+	    String extension = fileUrl.substring(fileUrl.lastIndexOf('.') + 1).toLowerCase();
 
-		Map<Boolean, styleDifferenceClass> mapStyleMessenger = Map.of(true,
-				new styleDifferenceClass(Pos.CENTER_RIGHT,
-						"-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"),
-				false, new styleDifferenceClass(Pos.CENTER_LEFT,
-						"-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
+	    boolean isImage = extension.equals("jpg") || extension.equals("jpeg") || extension.equals("png");
+	    boolean isVoice = extension.equals("wav") || extension.equals("mp3") || extension.equals("m4a");
 
-		FileRenderMessage controller = loader.getController();
-		if (isImage) {
-			controller.setImageInfo(fileData);
-		} else {
-			controller.setFileInfo(fileData);
-		}
+	    String fxmlPath;
+	    if (isImage) {
+	        fxmlPath = "/view/component/ShowImages.fxml";
+	    } else if (isVoice) {
+	        fxmlPath = "/view/component/VoiceBubble.fxml"; // Sử dụng FXML cho Voice
+	    } else {
+	        fxmlPath = "/view/component/FileBubble.fxml"; // File mặc định
+	    }
 
-		HBox hBox = new HBox(10);
-		hBox.setAlignment(mapStyleMessenger.get(isSend).position);
-		hBox.setPadding(new Insets(5, 5, 5, 10));
+	    FXMLLoader loader = new FXMLLoader(MessageRender.class.getResource(fxmlPath));
+	    Node fileBubble = loader.load();
 
-		if (!isSend) {
-			ImageView avatar = new ImageView(
-					new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
-			avatar.setFitWidth(30);
-			avatar.setFitHeight(30);
-			avatar.setClip(new Circle(15, 15, 15));
-			hBox.getChildren().addAll(avatar, fileBubble);
-		} else {
-			hBox.getChildren().add(fileBubble);
-		}
+	    Object controller = loader.getController(); 
 
-		VBox messageBox = new VBox(2);
-		if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
-			Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
-			nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
-			messageBox.getChildren().addAll(nameLabel, hBox);
-		} else {
-			messageBox.getChildren().add(hBox);
-		}
+	    Map<Boolean, styleDifferenceClass> mapStyleMessenger = Map.of(true,
+	            new styleDifferenceClass(Pos.CENTER_RIGHT,
+	                    "-fx-background-color: rgb(15,125,242); -fx-background-radius: 20px;"),
+	            false, new styleDifferenceClass(Pos.CENTER_LEFT,
+	                    "-fx-background-color: rgb(233,233,235); -fx-background-radius: 20px;"));
 
-		return messageBox;
+	    if (isImage) {
+	        FileRenderMessage imageController = (FileRenderMessage) controller;
+	        imageController.setImageInfo(fileData);
+
+	    } else if (isVoice) {
+	        VoiceMessageController voiceController = (VoiceMessageController) controller;
+	        
+	        String displayName = fileData.getFileName(); 
+	        if (displayName == null || displayName.isEmpty()) {
+	            displayName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
+	        }
+	        
+	        voiceController.setAudioUrl(fileData.getUrlUpload(), displayName);
+
+	    } else {
+	        FileRenderMessage fileController = (FileRenderMessage) controller;
+	        fileController.setFileInfo(fileData);
+	    }
+
+	    HBox hBox = new HBox(10);
+	    hBox.setAlignment(mapStyleMessenger.get(isSend).position);
+	    hBox.setPadding(new Insets(5, 5, 5, 10));
+
+	    if (!isSend) {
+	        ImageView avatar = new ImageView(
+	                new Image(redisUserService.getCachedAvatar(chatMessage.getSenderId()), true));
+	        avatar.setFitWidth(30);
+	        avatar.setFitHeight(30);
+	        avatar.setClip(new Circle(15, 15, 15));
+	        hBox.getChildren().addAll(avatar, fileBubble);
+	    } else {
+	        hBox.getChildren().add(fileBubble);
+	    }
+
+	    VBox messageBox = new VBox(2);
+	    if (!isSend && !chatMessage.getSenderId().equals(lastSenderId)) {
+	        Label nameLabel = new Label(redisUserService.getCachedUsername(chatMessage.getSenderId()));
+	        nameLabel.setStyle("-fx-font-weight: bold; -fx-padding: 0 0 3 5;");
+	        messageBox.getChildren().addAll(nameLabel, hBox);
+	    } else {
+	        messageBox.getChildren().add(hBox);
+	    }
+
+	    return messageBox;
 	}
 
 	public static Node renderFileLocal(File file, Boolean isImage) throws IOException {
@@ -234,6 +258,23 @@ public static Node renderTextMessage(ChatMessage chatMessage, boolean isSend, St
 		} else {
 			controller.setFileInfoLocal(file);
 		}
+
+		HBox hBox = new HBox(fileBubble);
+		hBox.setAlignment(Pos.CENTER_RIGHT);
+		hBox.setPadding(new Insets(5, 5, 5, 10));
+
+		VBox messageBox = new VBox(hBox);
+		
+		return messageBox;
+	}
+	
+	public static Node renderAudioLocal(byte[] audioData) throws IOException {
+		FXMLLoader loader = new FXMLLoader(MessageRender.class
+				.getResource("/view/component/VoiceBubble.fxml"));
+		Node fileBubble = loader.load();
+
+		VoiceMessageController controller = loader.getController();
+		controller.setAudioFile(audioData);
 
 		HBox hBox = new HBox(fileBubble);
 		hBox.setAlignment(Pos.CENTER_RIGHT);

@@ -1,11 +1,13 @@
 package controller.ServerAndClientSocket;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -592,6 +594,57 @@ public class SocketClient {
 					out.flush();
 					fis.close();
 					System.out.println("File sent: " + file.getName());
+				} catch (IOException e) {
+					notifyServerDisconnected("IO error: " + e.getMessage());
+				}
+			}).start();
+		} else {
+			notifyServerDisconnected("Server closed the connection.");
+		}
+	}
+
+	public void sendVoiceMessage(byte[] voiceData, String senderId, String converStationType, String receiverId) {
+		if (checkRunningServer()) {
+			new Thread(() -> {
+				try {
+					InputStream vis = new ByteArrayInputStream(voiceData);
+
+					ChatMessage chatMessage = new ChatMessage();
+					chatMessage.setSenderId(senderId);
+					if (converStationType.equalsIgnoreCase("group")) {
+						chatMessage.setGroupId(receiverId);
+					} else if (converStationType.equalsIgnoreCase("private")) {
+						chatMessage.setReceiverId(receiverId);
+					}
+
+					chatMessage.setType("voice");
+
+					chatMessage.setChatType(converStationType);
+					chatMessage.setRead(false);
+					chatMessage.setTimestamp(LocalDateTime.now());
+
+					Packet packetRequest = new Packet();
+					packetRequest.setType("FILE_META");
+					packetRequest.setData(chatMessage);
+
+					String voiceFileName = "voice_msg_" + System.currentTimeMillis() + ".wav";
+					long voiceFileSize = voiceData.length; 
+
+					chatMessage.setContent(gson.toJson(new FileInfo(voiceFileName, voiceFileSize, null)));
+
+					String json = gson.toJson(packetRequest);
+					out.writeUTF(json);
+					out.flush();
+
+					byte[] buffer = new byte[BUFFER_SIZE];
+					int count;
+					while ((count = vis.read(buffer)) > 0) {
+						out.write(buffer, 0, count);
+					}
+					out.flush();
+					vis.close(); 
+					System.out.println("Voice message sent: " + voiceFileName);
+
 				} catch (IOException e) {
 					notifyServerDisconnected("IO error: " + e.getMessage());
 				}

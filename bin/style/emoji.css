@@ -1,0 +1,14 @@
+/* Trong file emoji.css */
+
+/* Style cho các nút bấm chứa ảnh emoji */
+.emoji-button-image {
+    -fx-background-color: transparent; /* Nền trong suốt */
+    -fx-padding: 3px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+/* Thêm hiệu ứng khi di chuột qua */
+.emoji-button-image:hover {
+    -fx-background-color: #e0e0e0; /* Màu xám nhạt khi hover */
+}
